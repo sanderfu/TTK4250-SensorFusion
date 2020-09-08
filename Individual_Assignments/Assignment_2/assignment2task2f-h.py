@@ -166,12 +166,11 @@ ax3.axis('equal')
 ax3.legend()
 
 # % task 5 (h)
-line_normal = 1
 line_position = 5
 f = np.array([[-1,1]])
 y_mean = f@x_bar_cr
 y_cov = f@P_cr@f.transpose()
-prob_above_line = 1-norm.cdf(5,y_mean,y_cov).squeeze()
+prob_above_line = 1-norm.cdf(5,loc=y_mean,scale=sqrt(y_cov)).squeeze()
 
 print(f'Probability that it is above x_2 = x_1 + 5 is {prob_above_line}')
 fig4, ax4 = plt.subplots(num=4, clear=True)
