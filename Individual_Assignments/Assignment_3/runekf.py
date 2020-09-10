@@ -89,11 +89,13 @@ ax2.set_xlabel('time step')
 ax2.set_ylabel('turn rate')
 
 
+
+
 # %% a: tune by hand and comment
 
 # set parameters
 sigma_a = 0.6  # Tuning DONE
-sigma_z = 1  # Tuning DONE
+sigma_z = 0.1  # Tuning DONE
 
 #Comment: With these values the kalman filter output follows the ground truth quite accurately. By trusting the model more than the measurement,
 # we get less noise in our output and this was in focus when tuning to follow the ground truth in a smooth manner.
@@ -126,13 +128,10 @@ print(f'keys in stats is {stats.dtype.names}')
 # %% Calculate average performance metrics
 # stats['dists_pred'] contains 2 norm of position and speed for each time index
 # same for 'dists_upd'
-# TODO: square stats['dists_pred'] -> take its mean over time -> take square root
-RMSE_pred_pos = np.sqrt(pow(stats['dists_pred'][:,0],2).mean())
-RMSE_pred_vel = np.sqrt(pow(stats['dists_pred'][:,1],2).mean())
-RMSE_pred = [RMSE_pred_pos,RMSE_pred_vel]  # TODO
-RMSE_upd_pos = np.sqrt(pow(stats['dists_upd'][:,0],2).mean())
-RMSE_upd_vel = np.sqrt(pow(stats['dists_upd'][:,1],2).mean())
-RMSE_upd = [RMSE_upd_pos,RMSE_upd_vel]  # TODO
+# DONE: square stats['dists_pred'] -> take its mean over time -> take square root
+
+RMSE_pred = [np.sqrt(pow(stats['dists_pred'][:,i],2).mean()) for i in range(stats['dists_pred'].shape[1])]
+RMSE_upd = [np.sqrt(pow(stats['dists_upd'][:,i],2).mean()) for i in range(stats['dists_upd'].shape[1])]
 
 fig3, ax3 = plt.subplots(num=3, clear=True,dpi=200)
 
@@ -146,11 +145,11 @@ ax3.set_title(
 # % parameters for the parameter grid
 # TODO: pick reasonable values for grid search
 # n_vals = 20  # is Ok, try lower to begin with for more speed (20*20*1000 = 400 000 KF steps)
-n_vals = 20
-sigma_a_low = np.nan
-sigma_a_high = np.nan
-sigma_z_low = np.nan
-sigma_z_high = np.nan
+n_vals = 10
+sigma_a_low = 0.05
+sigma_a_high = 10
+sigma_z_low = 0.1
+sigma_z_high = 100
 
 # % set the grid on logscale(not mandatory)
 sigma_a_list = np.logspace(
@@ -165,31 +164,56 @@ stats_array = np.empty((n_vals, n_vals, K), dtype=dtype)
 # %% run through the grid and estimate
 # ? Should be more or less a copy of the above
 for i, sigma_a in enumerate(sigma_a_list):
-    dynmod = None  # TODO
+    dynmod = dynamicmodels.WhitenoiseAccelleration(sigma_a)  # DONE
+    # initialize mean and covariance
+    # DONE: ArrayLike (list, np. array, tuple, ...) with 4 elements
+    x_bar_init = np.array([0,0,0,0])
+    P_bar_init = np.diag([sigma_a,sigma_a,sigma_a,sigma_a])
+    init_ekfstate = ekf.GaussParams(x_bar_init, P_bar_init)
+        
     for j, sigma_z in enumerate(sigma_z_list):
-        measmod = None  # TODO
-        ekf_filter = None  # TODO
+        
+        measmod = measurmentmodels.CartesianPosition(sigma_z)  # DONE
+        ekf_filter = ekf.EKF(dynmod,measmod)  # DONE
 
-        ekfpred_list, ekfupd_list = None  # TODO
-        stats_array[i, j] = None  # TODO
-
+        ekfpred_list, ekfupd_list = ekf_filter.estimate_sequence(Z,init_ekfstate,Ts)  # DONE
+        stats_array[i, j] = ekf_filter.performance_stats_sequence(K,Z=Z,ekfpred_list=ekfpred_list,ekfupd_list=ekfupd_list, X_true=Xgt[:,:4],norm_idxs=[[0,1],[2,3]],norms=[2,2]) # DONE
 # %% calculate averages
 
-# TODO, remember to use axis argument, see eg. stats_array['dists_pred'].shape
-RMSE_pred = None  # TODO
-RMSE_upd = None  # TODO
-ANEES_pred = None  # TODO mean of NEES over time
-ANEES_upd = None  # TODO
-ANIS = None  # TODO mean of NIS over time
+# DONE, remember to use axis argument, see eg. stats_array['dists_pred'].shape
+RMSE_pred = np.empty((n_vals, n_vals, 2))
+for i in range(stats_array.shape[0]):
+    for j in range(stats_array.shape[1]):
+        RMSE_pred[i,j] = [np.sqrt(pow(stats_array[i,j]['dists_pred'][:,k],2).mean()) for k in range(stats_array[i,j]['dists_pred'].shape[1])]  # DONE
+        
+RMSE_upd = np.empty((n_vals, n_vals, 2))
+for i in range(stats_array.shape[0]):
+    for j in range(stats_array.shape[1]):
+        RMSE_upd[i,j] = [np.sqrt(pow(stats_array[i,j]['dists_upd'][:,k],2).mean()) for k in range(stats_array[i,j]['dists_upd'].shape[1])]  # DONE
+        
+ANEES_pred = np.empty((n_vals, n_vals))
+for i in range(stats_array.shape[0]):
+    for j in range(stats_array.shape[1]):
+        ANEES_pred[i,j] = stats_array[i,j]['NEESpred'].mean() # DONE (ANEES: mean of NEES over time)
+        
+ANEES_upd = np.empty((n_vals, n_vals))
+for i in range(stats_array.shape[0]):
+    for j in range(stats_array.shape[1]):
+        ANEES_upd[i,j] = stats_array[i,j]['NEESupd'].mean() #DONE
+        
+ANIS = np.empty((n_vals, n_vals))
+for i in range(stats_array.shape[0]):
+    for j in range(stats_array.shape[1]):
+        ANIS[i,j] = stats_array[i,j]['NIS'].mean() # DONE mean of NIS over time
 
 
 # %% find confidence regions for NIS and plot
-confprob = np.nan  # TODO number to use for confidence interval
-CINIS = np.nan  # TODO confidence intervall for NIS, hint: scipy.stats.chi2.interval
+confprob = 0.975  # TODO number to use for confidence interval
+CINIS = scipy.stats.chi2.interval(confprob,2*K,scale=1/K)  # TODO confidence intervall for NIS, hint: scipy.stats.chi2.interval
 print(CINIS)
 
 # plot
-fig4 = plt.figure(4, clear=True)
+fig4 = plt.figure(4, clear=True,dpi=400)
 ax4 = plt.gca(projection='3d')
 ax4.plot_surface(*np.meshgrid(sigma_a_list, sigma_z_list),
                  ANIS, alpha=0.9)
