@@ -196,7 +196,7 @@ class EKF:
         """Calculate the log likelihood of ekfstate at z in sensor_state"""
         # we need this function in IMM, PDA and IMM-PDA exercises
         # not necessary for tuning in EKF exercise
-        """FIND OUR MORE ABOUT THIS IN THE BOOK; I THINK IT IS THE MARGINAL p(z) AND THAT IT SOMEHOW LINKS TO THE INNOVATION AND NIS"""
+        """The likelihood function is p(z|x)"""
         v, S = self.innovation(z, ekfstate, sensor_state=sensor_state)
 
         # TODO: log likelihood, Hint: log(N(v, S))) -> NIS, la.slogdet.

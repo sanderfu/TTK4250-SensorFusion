@@ -108,16 +108,17 @@ print(ekf_filter)  # make use of the @dataclass automatic repr
 
 # initialize mean and covariance
 # DONE: ArrayLike (list, np. array, tuple, ...) with 4 elements
-x_bar_init = np.array([0,0,0,0])
-P_bar_init = np.diag([sigma_a,sigma_a,sigma_a,sigma_a])  # TODO: ArrayLike with 4 x 4 elements, hint: np.diag
+x_bar_init = np.array([0,0,1,1])
+"""
+    Awaiting answer in forum on how to choose P0
+"""
+P_bar_init = np.diag([50,50,10,10]) ** 2  # DONE: ArrayLike with 4 x 4 elements, hint: np.diag 
 init_ekfstate = ekf.GaussParams(x_bar_init, P_bar_init)
 
 # estimate
-# DONE
 ekfpred_list, ekfupd_list = ekf_filter.estimate_sequence(Z,init_ekfstate,Ts,)
 
 # get statistics:
-# TODO: see that you sort of understand what this does
 stats = ekf_filter.performance_stats_sequence(
     K, Z=Z, ekfpred_list=ekfpred_list, ekfupd_list=ekfupd_list, X_true=Xgt[:, :4],
     norm_idxs=[[0, 1], [2, 3]], norms=[2, 2]
@@ -145,7 +146,7 @@ ax3.set_title(
 # % parameters for the parameter grid
 # TODO: pick reasonable values for grid search
 # n_vals = 20  # is Ok, try lower to begin with for more speed (20*20*1000 = 400 000 KF steps)
-n_vals = 10
+n_vals = 5
 sigma_a_low = 0.05
 sigma_a_high = 10
 sigma_z_low = 0.1
@@ -208,7 +209,7 @@ for i in range(stats_array.shape[0]):
 
 
 # %% find confidence regions for NIS and plot
-confprob = 0.975  # TODO number to use for confidence interval
+confprob = 0.95  # TODO number to use for confidence interval
 CINIS = scipy.stats.chi2.interval(confprob,2*K,scale=1/K)  # TODO confidence intervall for NIS, hint: scipy.stats.chi2.interval
 print(CINIS)
 
