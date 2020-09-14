@@ -94,8 +94,8 @@ ax2.set_ylabel('turn rate')
 # %% a: tune by hand and comment
 
 # set parameters
-sigma_a = 0.6  # Tuning DONE
-sigma_z = 0.1  # Tuning DONE
+sigma_a = 1  # Tuning DONE
+sigma_z = 0.5 # Tuning DONE
 
 #Comment: With these values the kalman filter output follows the ground truth quite accurately. By trusting the model more than the measurement,
 # we get less noise in our output and this was in focus when tuning to follow the ground truth in a smooth manner.
@@ -107,12 +107,32 @@ ekf_filter = ekf.EKF(dynmod, measmod)
 print(ekf_filter)  # make use of the @dataclass automatic repr
 
 # initialize mean and covariance
-# DONE: ArrayLike (list, np. array, tuple, ...) with 4 elements
-x_bar_init = np.array([0,0,1,1])
 """
-    Awaiting answer in forum on how to choose P0
+Plan:
+    Initialize x_bar and P_bar with the initialization scheme found in Task2c
+
 """
-P_bar_init = np.diag([50,50,10,10]) ** 2  # DONE: ArrayLike with 4 x 4 elements, hint: np.diag 
+K_p1 = np.eye(2)
+K_p0 = np.zeros((2,2))
+K_u1 = 1/Ts * np.eye(2)
+K_u0 = -1/Ts * np.eye(2)
+K_matrix = np.bmat([[K_p1,K_p0],[K_u1,K_u0]])
+K_matrix = np.squeeze(np.asarray(K_matrix))
+
+z_vec = np.array([Z[0,:],Z[1,:]]).reshape(4,1)
+x_bar_init = (K_matrix@z_vec).squeeze()
+
+H = measmod.H(x_bar_init)
+R = measmod.R(x_bar_init)
+F = dynmod.F(x_bar_init,Ts)
+Q = dynmod.Q(x_bar_init,Ts)
+
+P_bar_init = K_matrix@np.bmat([[R,np.zeros((2,2))],[np.zeros((2,2)),H@np.linalg.inv(F)@Q@(H@np.linalg.inv(F)).T+R]])@K_matrix.T
+print("p_bar_init:\n", P_bar_init,"\n")
+
+
+
+
 init_ekfstate = ekf.GaussParams(x_bar_init, P_bar_init)
 
 # estimate
@@ -146,11 +166,11 @@ ax3.set_title(
 # % parameters for the parameter grid
 # TODO: pick reasonable values for grid search
 # n_vals = 20  # is Ok, try lower to begin with for more speed (20*20*1000 = 400 000 KF steps)
-n_vals = 5
-sigma_a_low = 0.05
-sigma_a_high = 10
-sigma_z_low = 0.1
-sigma_z_high = 100
+n_vals = 10
+sigma_a_low = 15
+sigma_a_high = 25
+sigma_z_low = 0.5
+sigma_z_high = 35
 
 # % set the grid on logscale(not mandatory)
 sigma_a_list = np.logspace(
@@ -168,8 +188,15 @@ for i, sigma_a in enumerate(sigma_a_list):
     dynmod = dynamicmodels.WhitenoiseAccelleration(sigma_a)  # DONE
     # initialize mean and covariance
     # DONE: ArrayLike (list, np. array, tuple, ...) with 4 elements
-    x_bar_init = np.array([0,0,0,0])
-    P_bar_init = np.diag([sigma_a,sigma_a,sigma_a,sigma_a])
+    z_vec = np.array([Z[0,:],Z[1,:]]).reshape(4,1)
+    x_bar_init = (K_matrix@z_vec).squeeze()
+
+    H = measmod.H(x_bar_init)
+    R = measmod.R(x_bar_init)
+    F = dynmod.F(x_bar_init,Ts)
+    Q = dynmod.Q(x_bar_init,Ts)
+
+    P_bar_init = K_matrix@np.bmat([[R,np.zeros((2,2))],[np.zeros((2,2)),H@np.linalg.inv(F)@Q@(H@np.linalg.inv(F)).T+R]])@K_matrix.T
     init_ekfstate = ekf.GaussParams(x_bar_init, P_bar_init)
         
     for j, sigma_z in enumerate(sigma_z_list):
@@ -210,7 +237,7 @@ for i in range(stats_array.shape[0]):
 
 # %% find confidence regions for NIS and plot
 confprob = 0.95  # TODO number to use for confidence interval
-CINIS = scipy.stats.chi2.interval(confprob,2*K,scale=1/K)  # TODO confidence intervall for NIS, hint: scipy.stats.chi2.interval
+CINIS = np.asarray(scipy.stats.chi2.interval(confprob,2*K))*1/K  # TODO confidence intervall for NIS, hint: scipy.stats.chi2.interval
 print(CINIS)
 
 # plot
