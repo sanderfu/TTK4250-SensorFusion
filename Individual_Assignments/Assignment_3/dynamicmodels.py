@@ -69,4 +69,4 @@ class WhitenoiseAccelleration:
         # sigma as a parameter, among other things.
         Ts_c = pow(Ts,3) #Ts_cubed
         Ts_s = pow(Ts,2) #Ts_squared
-        return np.array([[Ts_c/3,0,Ts_s/2,0],[0,Ts_c/3,0,Ts_s/2],[Ts_s/2,0,Ts,0],[0,Ts_s/2,0,Ts]])*self.sigma
+        return np.array([[Ts_c/3,0,Ts_s/2,0],[0,Ts_c/3,0,Ts_s/2],[Ts_s/2,0,Ts,0],[0,Ts_s/2,0,Ts]])*self.sigma**2

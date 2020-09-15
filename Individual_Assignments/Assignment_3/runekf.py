@@ -167,10 +167,10 @@ ax3.set_title(
 # TODO: pick reasonable values for grid search
 # n_vals = 20  # is Ok, try lower to begin with for more speed (20*20*1000 = 400 000 KF steps)
 n_vals = 10
-sigma_a_low = 15
-sigma_a_high = 25
+sigma_a_low = 1
+sigma_a_high = 5
 sigma_z_low = 0.5
-sigma_z_high = 35
+sigma_z_high = 5
 
 # % set the grid on logscale(not mandatory)
 sigma_a_list = np.logspace(
@@ -236,7 +236,7 @@ for i in range(stats_array.shape[0]):
 
 
 # %% find confidence regions for NIS and plot
-confprob = 0.95  # TODO number to use for confidence interval
+confprob = 0.80  # TODO number to use for confidence interval
 CINIS = np.asarray(scipy.stats.chi2.interval(confprob,2*K))*1/K  # TODO confidence intervall for NIS, hint: scipy.stats.chi2.interval
 print(CINIS)
 

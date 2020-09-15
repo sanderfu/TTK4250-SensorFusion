@@ -53,7 +53,7 @@ class EKF:
         Q = self.dynamic_model.Q(x, Ts)
 
         x_pred = self.dynamic_model.f(x,Ts)
-        P_pred = F@P@F.T+Q  # TODO
+        P_pred = F@P@F.T+Q  # DONE
 
         state_pred = GaussParams(x_pred, P_pred)
 

@@ -62,4 +62,4 @@ class CartesianPosition:
         # TODO
         # you do not need to care about sensor_state
         # sigma is available as self.sigma, and @dataclass makes it available in the init class constructor
-        return np.eye(2)*self.sigma
+        return np.eye(2)*self.sigma**2
