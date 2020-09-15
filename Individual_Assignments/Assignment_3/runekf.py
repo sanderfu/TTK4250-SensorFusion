@@ -47,7 +47,7 @@ except Exception as e:
 data_path = 'data_for_ekf.mat'
 
 # TODO: choose this for the last task
-usePregen = True  # choose between own generated data and pre generated
+usePregen = False  # choose between own generated data and pre generated
 
 if usePregen:
     loadData: dict = scipy.io.loadmat(data_path)
@@ -94,8 +94,8 @@ ax2.set_ylabel('turn rate')
 # %% a: tune by hand and comment
 
 # set parameters
-sigma_a = 1  # Tuning DONE
-sigma_z = 0.5 # Tuning DONE
+sigma_a = 7  # Tuning DONE
+sigma_z = 1 # Tuning DONE
 
 #Comment: With these values the kalman filter output follows the ground truth quite accurately. By trusting the model more than the measurement,
 # we get less noise in our output and this was in focus when tuning to follow the ground truth in a smooth manner.
@@ -167,10 +167,10 @@ ax3.set_title(
 # TODO: pick reasonable values for grid search
 # n_vals = 20  # is Ok, try lower to begin with for more speed (20*20*1000 = 400 000 KF steps)
 n_vals = 10
-sigma_a_low = 1
+sigma_a_low = 0.5
 sigma_a_high = 5
-sigma_z_low = 0.5
-sigma_z_high = 5
+sigma_z_low = 2
+sigma_z_high = 10
 
 # % set the grid on logscale(not mandatory)
 sigma_a_list = np.logspace(
@@ -186,22 +186,23 @@ stats_array = np.empty((n_vals, n_vals, K), dtype=dtype)
 # ? Should be more or less a copy of the above
 for i, sigma_a in enumerate(sigma_a_list):
     dynmod = dynamicmodels.WhitenoiseAccelleration(sigma_a)  # DONE
-    # initialize mean and covariance
-    # DONE: ArrayLike (list, np. array, tuple, ...) with 4 elements
-    z_vec = np.array([Z[0,:],Z[1,:]]).reshape(4,1)
-    x_bar_init = (K_matrix@z_vec).squeeze()
-
-    H = measmod.H(x_bar_init)
-    R = measmod.R(x_bar_init)
-    F = dynmod.F(x_bar_init,Ts)
-    Q = dynmod.Q(x_bar_init,Ts)
-
-    P_bar_init = K_matrix@np.bmat([[R,np.zeros((2,2))],[np.zeros((2,2)),H@np.linalg.inv(F)@Q@(H@np.linalg.inv(F)).T+R]])@K_matrix.T
-    init_ekfstate = ekf.GaussParams(x_bar_init, P_bar_init)
         
     for j, sigma_z in enumerate(sigma_z_list):
         
         measmod = measurmentmodels.CartesianPosition(sigma_z)  # DONE
+        # initialize mean and covariance
+        # DONE
+        z_vec = np.array([Z[0,:],Z[1,:]]).reshape(4,1)
+        x_bar_init = (K_matrix@z_vec).squeeze()
+    
+        H = measmod.H(x_bar_init)
+        R = measmod.R(x_bar_init)
+        F = dynmod.F(x_bar_init,Ts)
+        Q = dynmod.Q(x_bar_init,Ts)
+    
+        P_bar_init = K_matrix@np.bmat([[R,np.zeros((2,2))],[np.zeros((2,2)),H@np.linalg.inv(F)@Q@(H@np.linalg.inv(F)).T+R]])@K_matrix.T
+        init_ekfstate = ekf.GaussParams(x_bar_init, P_bar_init)
+        
         ekf_filter = ekf.EKF(dynmod,measmod)  # DONE
 
         ekfpred_list, ekfupd_list = ekf_filter.estimate_sequence(Z,init_ekfstate,Ts)  # DONE
@@ -209,6 +210,7 @@ for i, sigma_a in enumerate(sigma_a_list):
 # %% calculate averages
 
 # DONE, remember to use axis argument, see eg. stats_array['dists_pred'].shape
+"""The stupid way I did it first:
 RMSE_pred = np.empty((n_vals, n_vals, 2))
 for i in range(stats_array.shape[0]):
     for j in range(stats_array.shape[1]):
@@ -234,10 +236,18 @@ for i in range(stats_array.shape[0]):
     for j in range(stats_array.shape[1]):
         ANIS[i,j] = stats_array[i,j]['NIS'].mean() # DONE mean of NIS over time
 
+The efficient way to do it:
+"""
+RMSE_pred = np.sqrt(np.mean(np.square(stats_array['dists_pred']), axis=2))
+RMSE_upd = np.sqrt(np.mean(np.square(stats_array['dists_upd']), axis=2)) 
+ANEES_pred = np.mean(stats_array['NEESpred'], axis=2)
+ANEES_upd = np.mean(stats_array['NEESupd'], axis=2)
+ANIS = np.mean(stats_array['NIS'], axis=2)
 
 # %% find confidence regions for NIS and plot
-confprob = 0.80  # TODO number to use for confidence interval
-CINIS = np.asarray(scipy.stats.chi2.interval(confprob,2*K))*1/K  # TODO confidence intervall for NIS, hint: scipy.stats.chi2.interval
+confprob = 0.95  # TODO number to use for confidence interval
+s=2
+CINIS = np.asarray(scipy.stats.chi2.interval(confprob,s*K))*1/K  # TODO confidence intervall for NIS, hint: scipy.stats.chi2.interval
 print(CINIS)
 
 # plot
@@ -254,12 +264,13 @@ ax4.set_zlim(0, 10)
 ax4.view_init(30, 20)
 
 # %% find confidence regions for NEES and plot
-confprob = np.nan  # TODO
-CINEES = np.nan  # TODO, not NIS now, but very similar
+confprob = 0.95  # TODO
+d = 4
+CINEES = np.asarray(scipy.stats.chi2.interval(confprob, K*d))/K
 print(CINEES)
 
 # plot
-fig5 = plt.figure(5, clear=True)
+fig5 = plt.figure(5, clear=True,dpi=400)
 ax5s = [fig5.add_subplot(1, 2, 1, projection='3d'),
         fig5.add_subplot(1, 2, 2, projection='3d')]
 ax5s[0].plot_surface(*np.meshgrid(sigma_a_list, sigma_z_list),
@@ -283,7 +294,7 @@ ax5s[1].set_zlim(0, 50)
 ax5s[1].view_init(40, 30)
 
 # %% see the intersection of NIS and NEESes
-fig6, ax6 = plt.subplots(num=6, clear=True)
+fig6, ax6 = plt.subplots(num=6, clear=True,dpi=400)
 cont_upd = ax6.contour(*np.meshgrid(sigma_a_list, sigma_z_list),
                        ANEES_upd, CINEES, colors=['C0', 'C1'], labels='ANEESupd')
 cont_pred = ax6.contour(*np.meshgrid(sigma_a_list, sigma_z_list),
