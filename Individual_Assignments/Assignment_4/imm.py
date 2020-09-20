@@ -18,7 +18,8 @@ from typing import (
 )
 from mixturedata import MixtureParameters
 from gaussparams import GaussParams
-from estimatorduck import StateEstimator
+from ekf import EKF as StateEstimator
+#from estimatorduck import StateEstimator
 from mixtruereduction import gaussian_mixture_moments
 
 # packages
@@ -84,8 +85,7 @@ class IMM(Generic[MT]):
         mix_probabilities: np.ndarray,
     ) -> List[MT]:
 
-        """The line below is wrong but I have no idea how to get means and covariances of the components"""
-        mixed_states = gaussian_mixture_moments(immstate.weight,immstate.components.mean,immstate.components.cov)
+        mixed_states = gaussian_mixture_moments(mix_probabilities,immstate.components[:].mean,immstate.components[:].cov)
         return mixed_states
 
     def mode_matched_prediction(
@@ -94,7 +94,7 @@ class IMM(Generic[MT]):
         # The sampling time
         Ts: float,
     ) -> List[MT]:
-        modestates_pred = # TODO
+        modestates_pred = self.filters[:].predict(mode_states,Ts)
         return modestates_pred
 
     def predict(
@@ -110,12 +110,12 @@ class IMM(Generic[MT]):
         appoximate resulting state distribution as Gaussian for each mode, then predict each mode.
         """
 
-        # TODO: proposed structure
-        predicted_mode_probability, mixing_probability = # TODO
+        # DONE: proposed structure
+        predicted_mode_probability, mixing_probability = mix_probabilities(immstate,Ts) # DONE
 
-        mixed_mode_states: List[MT] = # TODO
+        mixed_mode_states: List[MT] = mix_state(immstate,mixing_probability) # DONE
 
-        predicted_mode_states = # TODO
+        predicted_mode_states = mode_matched_prediction(mixed_mode_states,Ts) # DONE
 
         predicted_immstate = MixtureParameters(
             predicted_mode_probability, predicted_mode_states
