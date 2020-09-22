@@ -18,6 +18,8 @@ from dataclasses import dataclass, field
 import numpy as np
 import scipy.linalg as la
 import scipy
+from typing import Dict, Any, Generic, TypeVar
+from typing_extensions import Protocol, runtime
 
 # local
 import dynamicmodels as dynmods
@@ -26,9 +28,11 @@ from gaussparams import GaussParams, GaussParamList
 
 # %% The EKF
 
+T = TypeVar("T")
+
 
 @dataclass
-class EKF:
+class EKF(Protocol[T]):
     # A Protocol so duck typing can be used
     dynamic_model: dynmods.DynamicModel
     # A Protocol so duck typing can be used
@@ -194,13 +198,12 @@ class EKF:
                       sensor_state: Dict[str, Any] = None
                       ) -> float:
         """Calculate the log likelihood of ekfstate at z in sensor_state"""
-        # we need this function in IMM, PDA and IMM-PDA exercises
-        # not necessary for tuning in EKF exercise
-        """The likelihood function is p(z|x)"""
         v, S = self.innovation(z, ekfstate, sensor_state=sensor_state)
-
-        # TODO: log likelihood, Hint: log(N(v, S))) -> NIS, la.slogdet.
-        ll = None
+        cholS = la.cholesky(S, lower=True)
+        invcholS_v = la.solve_triangular(cholS, v, lower=True)
+        NISby2 = (invcholS_v ** 2).sum() / 2
+        logdetSby2 = np.log(cholS)
+        ll = -(NISby2 + logdetSby2 + self._MLOG2PIby2)
 
         return ll
 

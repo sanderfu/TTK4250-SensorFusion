@@ -18,8 +18,8 @@ from typing import (
 )
 from mixturedata import MixtureParameters
 from gaussparams import GaussParams
-#from ekf import EKF as StateEstimator
-from estimatorduck import StateEstimator
+from ekf import EKF as StateEstimator
+#from estimatorduck import StateEstimator
 from mixturereduction import gaussian_mixture_moments
 
 # packages
@@ -190,6 +190,7 @@ class IMM(Generic[MT]):
         # potential intermediate step logjoint =
 
         
+        #Eq 6.33
         updated_mode_probabilities = mode_loglikelihood*immstate.weights/np.sum(mode_loglikelihood*immstate.weights)
 
         # Optional debuging
