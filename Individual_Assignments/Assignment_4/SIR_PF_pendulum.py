@@ -136,7 +136,9 @@ for k in range(K):
     print(f"k = {k}")
     # weight update
     for n in range(N):
-        w[n] = PF_measurement_distribution.pdf(Z[k]-h(px[n],Ld,l,Ll)) # DONE, hint: PF_measurement_distribution.pdf
+        w[n] = np.log(w[n])+np.log(PF_measurement_distribution.pdf(Z[k]-h(px[n],Ld,l,Ll))) # DONE, hint: PF_measurement_distribution.pdf
+        w[n] += np.max(w[n])
+        w[n] = np.exp(w[n])
     w = w/np.sum(w)# DONE? : normalize
 
     # resample
