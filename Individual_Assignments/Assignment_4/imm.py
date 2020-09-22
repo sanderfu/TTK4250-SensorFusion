@@ -18,9 +18,9 @@ from typing import (
 )
 from mixturedata import MixtureParameters
 from gaussparams import GaussParams
-from ekf import EKF as StateEstimator
-#from estimatorduck import StateEstimator
-from mixtruereduction import gaussian_mixture_moments
+#from ekf import EKF as StateEstimator
+from estimatorduck import StateEstimator
+from mixturereduction import gaussian_mixture_moments
 
 # packages
 from dataclasses import dataclass
@@ -84,10 +84,32 @@ class IMM(Generic[MT]):
         # the mixing probabilities: shape=(M, M)
         mix_probabilities: np.ndarray,
     ) -> List[MT]:
-
+        
         mixed_states = []
+        components_mean = []
+        components_cov = []
+        """
+        Plan: Fetch the means and covariances of all components 
+        Explanation of what component is: every component consists of a Gaussian describing 
+        the state under a given mode and the weight for this Gaussian to be used in mixture.
+        """
         for component in immstate.components:
-            mixed_states.append(gaussian_mixture_moments(mix_probabilities,component.mean,component.cov))
+            components_mean.append(component.mean)
+            components_cov.append(component.cov)
+        
+        #Make sure that lists are numpy lists
+        components_mean = np.array(components_mean)
+        components_cov = np.array(components_cov)
+        
+        #For every mode, mix the states with the correct row of mixing
+        #probabilities from mix_probabilities
+        for row in mix_probabilities:
+            mixed_states.append(gaussian_mixture_moments(row,components_mean,components_cov))
+        
+        #After this make sure mixed_states is numpy array
+        mixed_states = np.array(mixed_states)
+        
+        #Return (M,1) vector (one elem for each mode) of GaussParams (mean and cov)
         return mixed_states
 
     def mode_matched_prediction(
@@ -97,8 +119,17 @@ class IMM(Generic[MT]):
         Ts: float,
     ) -> List[MT]:
         modestates_pred = []
-        for ekf_filter in self.filters:
-            modestates_pred.append(ekf_filter(mode_states,Ts))
+        
+        #Every mode Sk has its corresponding filter, run the mode through the
+        # predict step of its corresponding filter
+        for ekf_filter,mode_state in zip(self.filters,mode_states):
+            modestates_pred.append(ekf_filter.pred(mode_state,Ts))
+            
+        #Ensure modestates_pred becomes numpy array
+        modestates_pred = np.array(modestates_pred)
+        
+        #Return vector of size (M,...) of Gaussparams for predicted state for
+        #every mode (mean and cov)
         return modestates_pred
 
     def predict(
@@ -124,6 +155,8 @@ class IMM(Generic[MT]):
         predicted_immstate = MixtureParameters(
             predicted_mode_probability, predicted_mode_states
         )
+        #Return vector of size (M,..) with weights (mode probabilities)
+        #and components (which is GaussParams mean and cov) 
         return predicted_immstate
 
     def mode_matched_update(
@@ -135,9 +168,12 @@ class IMM(Generic[MT]):
         """Update each mode in immstate with z in sensor_state."""
         
         updated_state = []
-        for ekf_filter in self.filters:    
-            updated_state.append(ekf_filter.update(z,immstate,sensor_state))
+        for ekf_filter,mode_state in zip(self.filters,immstate.components):    
+            updated_state.append(ekf_filter.update(z,mode_state,sensor_state))
 
+        updated_state = np.array(updated_state)
+        #Return vector (M,...) with means and covariance for every mode 
+        #MT = GaussParams
         return updated_state
 
     def update_mode_probabilities(
@@ -152,10 +188,9 @@ class IMM(Generic[MT]):
         mode_loglikelihood = (z-h(immstate[:].mean))@np.inv(immstate[:].cov)@(z-h(immstate[:].mean)).T
 
         # potential intermediate step logjoint =
+
         
-        predicted_mode_probability_vec = immstate.components[:].predicted_mode_probability
-        
-        updated_mode_probabilities = mode_loglikelihood*predicted_mode_probability_vec/np.sum(mode_loglikelihood*predicted_mode_probability_vec)
+        updated_mode_probabilities = mode_loglikelihood*immstate.weights/np.sum(mode_loglikelihood*immstate.weights)
 
         # Optional debuging
         assert np.all(np.isfinite(updated_mode_probabilities))

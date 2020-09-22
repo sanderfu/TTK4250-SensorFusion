@@ -89,7 +89,7 @@ ax2.set_ylabel("z")
 # %% Task: Estimate using a particle filter
 
 # number of particles to use
-N = 1000 # DONE (not sure if okay amount)
+N = 100 # DONE (not sure if okay amount)
 
 # initialize particles, pretend you do not know where the pendulum starts
 """
@@ -99,7 +99,7 @@ The point:
     as it would indicate that we are more confident that the state is at this concentration than elsewhere.
 """
 px = np.array([
-    rng.uniform(-2*np.pi, 2*np.pi, size=N), # DONE?,
+    rng.uniform(-np.pi, np.pi, size=N), # DONE?,
     rng.uniform(-np.pi/4, np.pi/4, size=N) # DONE?
     ]).T
 
@@ -136,9 +136,8 @@ for k in range(K):
     print(f"k = {k}")
     # weight update
     for n in range(N):
-        w[n] = np.log(w[n])+np.log(PF_measurement_distribution.pdf(Z[k]-h(px[n],Ld,l,Ll))) # DONE, hint: PF_measurement_distribution.pdf
-        w[n] += np.max(w[n])
-        w[n] = np.exp(w[n])
+        w[n] = PF_measurement_distribution.pdf(Z[k]-h(px[n],Ld,l,Ll)) # DONE, hint: PF_measurement_distribution.pdf
+    w = w+eps
     w = w/np.sum(w)# DONE? : normalize
 
     # resample
@@ -154,10 +153,11 @@ for k in range(K):
             i+=1
         pxn[n] = px[i]
     rng.shuffle(pxn,axis=0)
+    w = np.ones(N) / N
 
     # trajecory sample prediction
     for n in range(N):
-        vkn = PF_dynamic_distribution.rvs(1)# DONE: process noise, hint: PF_dynamic_distribution.rvs
+        vkn = PF_dynamic_distribution.rvs()# DONE: process noise, hint: PF_dynamic_distribution.rvs
         px[n] = pendulum_dynamics_discrete(px[n],vkn,Ts,a)# DONE: particle prediction
 
     # plot
