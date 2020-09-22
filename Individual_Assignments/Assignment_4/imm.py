@@ -85,7 +85,9 @@ class IMM(Generic[MT]):
         mix_probabilities: np.ndarray,
     ) -> List[MT]:
 
-        mixed_states = gaussian_mixture_moments(mix_probabilities,immstate.components[:].mean,immstate.components[:].cov)
+        mixed_states = []
+        for component in immstate.components:
+            mixed_states.append(gaussian_mixture_moments(mix_probabilities,component.mean,component.cov))
         return mixed_states
 
     def mode_matched_prediction(
@@ -94,7 +96,9 @@ class IMM(Generic[MT]):
         # The sampling time
         Ts: float,
     ) -> List[MT]:
-        modestates_pred = self.filters[:].predict(mode_states,Ts)
+        modestates_pred = []
+        for ekf_filter in self.filters:
+            modestates_pred.append(ekf_filter(mode_states,Ts))
         return modestates_pred
 
     def predict(
@@ -129,8 +133,10 @@ class IMM(Generic[MT]):
         sensor_state: Optional[Dict[str, Any]] = None,
     ) -> List[MT]:
         """Update each mode in immstate with z in sensor_state."""
-
-        updated_state = self.filters[:].update(z,immstate,sensor_state)
+        
+        updated_state = []
+        for ekf_filter in self.filters:    
+            updated_state.append(ekf_filter.update(z,immstate,sensor_state))
 
         return updated_state
 
@@ -141,14 +147,15 @@ class IMM(Generic[MT]):
         sensor_state: Dict[str, Any] = None,
     ) -> np.ndarray:
         """Calculate the mode probabilities in immstate updated with z in sensor_state"""
-
+        
+        """ The below line is wrong!"""
         mode_loglikelihood = (z-h(immstate[:].mean))@np.inv(immstate[:].cov)@(z-h(immstate[:].mean)).T
 
         # potential intermediate step logjoint =
         
         predicted_mode_probability_vec = immstate.components[:].predicted_mode_probability
         
-        updated_mode_probabilities = mode_loglikelihood*predicted_mode_probability/np.sum(mode_loglikelihood*predicted_mode_probability_vec)
+        updated_mode_probabilities = mode_loglikelihood*predicted_mode_probability_vec/np.sum(mode_loglikelihood*predicted_mode_probability_vec)
 
         # Optional debuging
         assert np.all(np.isfinite(updated_mode_probabilities))
@@ -212,7 +219,7 @@ class IMM(Generic[MT]):
         )
 
         # flip conditioning order with Bayes
-        mode_prob, mode_conditioned_component_prob = discretebayes.discrete_bayes(immstate.weights,component_conditioned_mode_prob) # DONE
+        mode_prob, mode_conditioned_component_prob = discretebayes.discrete_bayes(immstate_mixture.weights,component_conditioned_mode_prob) # DONE
 
         # Hint list_a of lists_b to list_b of lists_a: zip(*immstate_mixture.components)
         mode_states = None # TODO:
@@ -226,8 +233,8 @@ class IMM(Generic[MT]):
 
         # ! You can assume all the modes have the same reduce and estimate function
         # ! and use eg. self.filters[0] functionality
-        data_reduced = # TODO
-        estimate = # TODO
+        data_reduced = None# TODO
+        estimate = None # TODO
         return estimate
 
     def gate(

@@ -89,16 +89,26 @@ ax2.set_ylabel("z")
 # %% Task: Estimate using a particle filter
 
 # number of particles to use
-N = # TODO
+N = 1000 # DONE (not sure if okay amount)
 
 # initialize particles, pretend you do not know where the pendulum starts
+"""
+The point: 
+    Create N particles that combined are distributed over all possible state combinations for the system.
+    Use the uniform distribution to make sure we do not get any consentration of particles initially,
+    as it would indicate that we are more confident that the state is at this concentration than elsewhere.
+"""
 px = np.array([
-    rng. # TODO,
-    rng. # TODO
+    rng.uniform(-2*np.pi, 2*np.pi, size=N), # DONE?,
+    rng.uniform(-np.pi/4, np.pi/4, size=N) # DONE?
     ]).T
 
 # initial weights
-w = # TODO
+"""
+We do not know which particle is good or bad, so set all to equal weight 1/N so that they sum to 1 (normalized)
+
+"""
+w = np.ones(N)/N # DONE?
 
 # allocate some space for resampling particles
 pxn = np.zeros_like(px)
@@ -126,21 +136,27 @@ for k in range(K):
     print(f"k = {k}")
     # weight update
     for n in range(N):
-        w[n] =  # TODO, hint: PF_measurement_distribution.pdf
-    w = # TODO: normalize
+        w[n] = PF_measurement_distribution.pdf(Z[k]-h(px[n],Ld,l,Ll)) # DONE, hint: PF_measurement_distribution.pdf
+    w = w/np.sum(w)# DONE? : normalize
 
     # resample
-    # TODO: some pre calculations?
+    # DONE: some pre calculations -> cumulative sum
+    cumw = np.cumsum(w)
+    noise = rng.random((1, 1)) / N
     i = 0
     for n in range(N):
         # find a particle 'i' to pick
         # algorithm in the book, but there are other options as well
+        u = n/N + noise
+        while u>cumw[i]:
+            i+=1
         pxn[n] = px[i]
+    rng.shuffle(pxn,axis=0)
 
     # trajecory sample prediction
-    for n in range(n):
-        vkn = # TODO: process noise, hint: PF_dynamic_distribution.rvs
-        px[n] = # TODO: particle prediction
+    for n in range(N):
+        vkn = PF_dynamic_distribution.rvs(1)# DONE: process noise, hint: PF_dynamic_distribution.rvs
+        px[n] = pendulum_dynamics_discrete(px[n],vkn,Ts,a)# DONE: particle prediction
 
     # plot
     sch_particles.set_offsets(np.c_[l * np.sin(pxn[:, 0]), -l * np.cos(pxn[:, 0])])
