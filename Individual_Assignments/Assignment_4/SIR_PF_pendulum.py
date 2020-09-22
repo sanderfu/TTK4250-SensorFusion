@@ -8,7 +8,7 @@ rng = np.random.default_rng()
 # scenario parameters
 x0 = np.array([np.pi / 2, -np.pi / 100])
 Ts = 0.05
-K = round(20 / Ts)
+K = round(10 / Ts)
 
 # constants
 g = 9.81
@@ -60,7 +60,7 @@ axs1[1].set_ylabel(r"$\dot \theta$")
 
 # constants
 Ld = 4
-Ll = 0
+Ll = 1
 r = 0.25
 
 # noise pdf
@@ -89,7 +89,7 @@ ax2.set_ylabel("z")
 # %% Task: Estimate using a particle filter
 
 # number of particles to use
-N = 100 # DONE (not sure if okay amount)
+N = 2000 # DONE
 
 # initialize particles, pretend you do not know where the pendulum starts
 """
@@ -99,8 +99,8 @@ The point:
     as it would indicate that we are more confident that the state is at this concentration than elsewhere.
 """
 px = np.array([
-    rng.uniform(-np.pi, np.pi, size=N), # DONE?,
-    rng.uniform(-np.pi/4, np.pi/4, size=N) # DONE?
+    rng.uniform(-np.pi, np.pi, N),  # x1 = theta
+    rng.normal(size=N) * np.pi/4  # x2 = theta_dot
     ]).T
 
 # initial weights
@@ -108,7 +108,7 @@ px = np.array([
 We do not know which particle is good or bad, so set all to equal weight 1/N so that they sum to 1 (normalized)
 
 """
-w = np.ones(N)/N # DONE?
+w = np.full((N,1), 1/N)
 
 # allocate some space for resampling particles
 pxn = np.zeros_like(px)
@@ -131,18 +131,25 @@ ax4.set_ylabel("y")
 th = ax4.set_title(f"theta mapped to x-y")
 ax4.legend()
 
+particle_out = np.zeros((K,2))
+
 eps = np.finfo(float).eps
 for k in range(K):
     print(f"k = {k}")
     # weight update
+    # update weights using (5.39)
     for n in range(N):
-        w[n] = PF_measurement_distribution.pdf(Z[k]-h(px[n],Ld,l,Ll)) # DONE, hint: PF_measurement_distribution.pdf
-    w = w+eps
-    w = w/np.sum(w)# DONE? : normalize
+        # Using (5.39) to perform weight update
+        w[n] = PF_measurement_distribution.pdf(Z[k] - h(px[n], Ld, l, Ll))
+    w = w + eps #Avoid round-off error
+    w = w / np.sum(w)#normalize
 
-    # resample
+    N_eff = 1 / np.sum(w ** 2)
+    print(f"N_eff = {N_eff}")
+
+    # resample using algorithm 3 p. 90
     # DONE: some pre calculations -> cumulative sum
-    cumw = np.cumsum(w)
+    cumw = np.cumsum(w) # staircase cdf
     noise = rng.random((1, 1)) / N
     i = 0
     for n in range(N):
@@ -150,23 +157,43 @@ for k in range(K):
         # algorithm in the book, but there are other options as well
         u = n/N + noise
         while u>cumw[i]:
-            i+=1
-        pxn[n] = px[i]
-    rng.shuffle(pxn,axis=0)
-    w = np.ones(N) / N
+            i += 1
+        pxn[n] = px[i] # resampled particles, instead of indicesout
+    rng.shuffle(pxn,axis=0) # shuffle to maximize randomness
+    w.fill(1 / N)
+    # resetting all weights to 1/N, it's not mentioned in the book.
 
     # trajecory sample prediction
+    # propose new particles using (5.38)
     for n in range(N):
-        vkn = PF_dynamic_distribution.rvs()# DONE: process noise, hint: PF_dynamic_distribution.rvs
-        px[n] = pendulum_dynamics_discrete(px[n],vkn,Ts,a)# DONE: particle prediction
+        # process noise, hint: PF_dynamic_distribution.rvs
+        vkn = PF_dynamic_distribution.rvs()
+        # particle prediction/proposal according proposal density q = p (5.38)
+        px[n] = pendulum_dynamics_discrete(pxn[n], vkn, Ts, a)
+
+    # centroid of theta position of particles
+    px_theta_centroid = np.mean(pxn[:, 0], axis=0)
+    particle_out[k] = px_theta_centroid
 
     # plot
-    sch_particles.set_offsets(np.c_[l * np.sin(pxn[:, 0]), -l * np.cos(pxn[:, 0])])
-    sch_true.set_offsets(np.c_[l * np.sin(x[k, 0]), -l * np.cos(x[k, 0])])
+    show_plot = False
+    if show_plot:
+        sch_particles.set_offsets(np.c_[l * np.sin(pxn[:, 0]), -l * np.cos(pxn[:, 0])])
+        sch_true.set_offsets(np.c_[l * np.sin(x[k, 0]), -l * np.cos(x[k, 0])])
 
-    fig4.canvas.draw_idle()
-    plt.show(block=False)
-    plt.waitforbuttonpress(plotpause)
+        fig4.canvas.draw_idle()
+        plt.show(block=False)
+        plt.waitforbuttonpress(plotpause)
+if show_plot:
+    plt.waitforbuttonpress()
 
+# %% plot particle centroid path
+fig5, ax5 = plt.subplots(num=5, clear=True)
+ax5.plot(particle_out[:,0], label='Particle theta mean')
+ax5.plot(x[:,0], label='True theta')
+ax5.set_xlabel("Time step")
+ax5.set_ylabel(r"$\theta_{particles}$")
+ax5.legend()
+ax5.set_title('Particle mean vs true path')
+plt.show()
 plt.waitforbuttonpress()
-# %%
