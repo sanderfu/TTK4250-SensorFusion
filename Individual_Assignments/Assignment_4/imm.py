@@ -184,8 +184,8 @@ class IMM(Generic[MT]):
     ) -> np.ndarray:
         """Calculate the mode probabilities in immstate updated with z in sensor_state"""
         
-        """ The below line is wrong!"""
-        mode_loglikelihood = (z-h(immstate[:].mean))@np.inv(immstate[:].cov)@(z-h(immstate[:].mean)).T
+        """Line below is work in progress heh"""
+        mode_loglikelihood = None
 
         # potential intermediate step logjoint =
 
