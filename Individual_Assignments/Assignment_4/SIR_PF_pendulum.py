@@ -60,7 +60,7 @@ axs1[1].set_ylabel(r"$\dot \theta$")
 
 # constants
 Ld = 4
-Ll = 1
+Ll = 4
 r = 0.25
 
 # noise pdf
@@ -89,7 +89,7 @@ ax2.set_ylabel("z")
 # %% Task: Estimate using a particle filter
 
 # number of particles to use
-N = 2000 # DONE
+N = 1000 # DONE
 
 # initialize particles, pretend you do not know where the pendulum starts
 """
@@ -139,15 +139,14 @@ for k in range(K):
     # weight update
     # update weights using (5.39)
     for n in range(N):
-        # Using (5.39) to perform weight update
-        w[n] = PF_measurement_distribution.pdf(Z[k] - h(px[n], Ld, l, Ll))
+        w[n] *= PF_measurement_distribution.pdf(Z[k] - h(px[n], Ld, l, Ll))
     w = w + eps #Avoid round-off error
     w = w / np.sum(w)#normalize
 
     N_eff = 1 / np.sum(w ** 2)
     print(f"N_eff = {N_eff}")
 
-    # resample using algorithm 3 p. 90
+    # resample (Algorithm 3, p. 90)
     # DONE: some pre calculations -> cumulative sum
     cumw = np.cumsum(w) # staircase cdf
     noise = rng.random((1, 1)) / N
@@ -158,13 +157,15 @@ for k in range(K):
         u = n/N + noise
         while u>cumw[i]:
             i += 1
-        pxn[n] = px[i] # resampled particles, instead of indicesout
+        pxn[n] = px[i] # resampled particles
+        w[n]=w[i] #Update weights of resampled particles
     rng.shuffle(pxn,axis=0) # shuffle to maximize randomness
-    w.fill(1 / N)
-    # resetting all weights to 1/N, it's not mentioned in the book.
+    
+    #Normalize weights so that sum equals 1.
+    w = w/np.sum(w)
 
     # trajecory sample prediction
-    # propose new particles using (5.38)
+    # propose new particles using eq. 5.38
     for n in range(N):
         # process noise, hint: PF_dynamic_distribution.rvs
         vkn = PF_dynamic_distribution.rvs()
@@ -176,7 +177,7 @@ for k in range(K):
     particle_out[k] = px_theta_centroid
 
     # plot
-    show_plot = False
+    show_plot = True
     if show_plot:
         sch_particles.set_offsets(np.c_[l * np.sin(pxn[:, 0]), -l * np.cos(pxn[:, 0])])
         sch_true.set_offsets(np.c_[l * np.sin(x[k, 0]), -l * np.cos(x[k, 0])])
@@ -185,7 +186,8 @@ for k in range(K):
         plt.show(block=False)
         plt.waitforbuttonpress(plotpause)
 if show_plot:
-    plt.waitforbuttonpress()
+    #plt.waitforbuttonpress()
+    None
 
 # %% plot particle centroid path
 fig5, ax5 = plt.subplots(num=5, clear=True)
