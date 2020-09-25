@@ -1,6 +1,3 @@
-"""
-
-"""
 # %% Imports
 
 # types
@@ -39,7 +36,7 @@ MT = TypeVar("MT")  # a type variable to be the mode type
 @dataclass
 class IMM(Generic[MT]):
     # The M filters the IMM relies on
-    filters: List[StateEstimator[MT]]
+    filters: List[StateEstimator]
     # the transition matrix. PI[i, j] = probability of going from model i to j: shape (M, M)
     PI: np.ndarray
     # init mode probabilities if none is given
@@ -69,7 +66,11 @@ class IMM(Generic[MT]):
         # mix_probabilities[s] is the mixture weights for mode s
         """Calculate the predicted mode probability and the mixing probabilities."""
 
-        predicted_mode_probabilities, mix_probabilities = discretebayes.discrete_bayes(immstate.weights,self.PI)
+        # predicted_mode_probabilities is p_{k | k-1} (used in (6.33))
+        # mix_probabilities is all \mu_{s_{k-1} | s_k} (from (6.27))
+        #   is an MxM matrix
+        predicted_mode_probabilities, mix_probabilities = \
+            discretebayes.discrete_bayes(immstate.weights, self.PI)        
 
         # Optional assertions for debugging
         assert np.all(np.isfinite(predicted_mode_probabilities))
@@ -85,7 +86,6 @@ class IMM(Generic[MT]):
         mix_probabilities: np.ndarray,
     ) -> List[MT]:
         
-        mixed_states = []
         components_mean = []
         components_cov = []
         """
@@ -101,10 +101,28 @@ class IMM(Generic[MT]):
         components_mean = np.array(components_mean)
         components_cov = np.array(components_cov)
         
+        
+        # mixed_states is a list of GaussParams (/MT) on the form
+        # [
+        #   Mode1: \hat{x}_{k-1}^{0,(1)}, P_{k-1}^{0,(1)}
+        #   Mode2: \hat{x}_{k-1}^{0,(2)}, P_{k-1}^{0,(2)}
+        #   ...
+        #   ModeM: \hat{x}_{k-1}^{0,(M)}, P_{k-1}^{0,(M)}
+        # ]
+        # where \hat{x}_{k-1}^{0,(M)}, P_{k-1}^{0,(M)} are the first and
+        # second moment of the gaussian reduction for each mode s_k.
+        mixed_states = []
+
+        # mix_probabilities is an MxM matrix where each row is the weights to
+        # use in mixing modes 1..M into mode 1 (row 1), mode 2 (row 2), ...,
+        # mode M (row M). The loop variable mix_weights is each row.
+        # This uses the equations (6.29) and (6.30)
+        
         #For every mode, mix the states with the correct row of mixing
         #probabilities from mix_probabilities
-        for row in mix_probabilities:
-            mixed_states.append(gaussian_mixture_moments(row,components_mean,components_cov))
+        for mix_weights in mix_probabilities:
+            mean, cov = gaussian_mixture_moments(mix_weights,components_mean,components_cov)
+            mixed_states.append(GaussParams(mean,cov))
         
         #After this make sure mixed_states is numpy array
         mixed_states = np.array(mixed_states)
@@ -123,7 +141,7 @@ class IMM(Generic[MT]):
         #Every mode Sk has its corresponding filter, run the mode through the
         # predict step of its corresponding filter
         for ekf_filter,mode_state in zip(self.filters,mode_states):
-            modestates_pred.append(ekf_filter.pred(mode_state,Ts))
+            modestates_pred.append(ekf_filter.predict(mode_state,Ts))
             
         #Ensure modestates_pred becomes numpy array
         modestates_pred = np.array(modestates_pred)
@@ -148,7 +166,7 @@ class IMM(Generic[MT]):
         # DONE: proposed structure
         predicted_mode_probability, mixing_probability = self.mix_probabilities(immstate,Ts) # DONE
 
-        mixed_mode_states: List[MT] = self.mix_state(immstate,mixing_probability) # DONE
+        mixed_mode_states: List[MT] = self.mix_states(immstate,mixing_probability) # DONE
 
         predicted_mode_states = self.mode_matched_prediction(mixed_mode_states,Ts) # DONE
 
@@ -184,14 +202,25 @@ class IMM(Generic[MT]):
     ) -> np.ndarray:
         """Calculate the mode probabilities in immstate updated with z in sensor_state"""
         
-        """Line below is work in progress heh"""
-        mode_loglikelihood = None
+        # (6.32), shape = (M,1)
+        mode_loglikelihood = mode_loglikelihood = np.array(
+            [filt.loglikelihood(z, comp, sensor_state) \
+             for filt, comp in zip(self.filters, immstate.components)])
 
-        # potential intermediate step logjoint =
+        # (6.33)
+        predicted_mode_probabilities = immstate.weights # shape (M,1)
+        normalization = \
+            np.sum(np.exp(mode_loglikelihood) * predicted_mode_probabilities) # scalar float
 
+        log_pred_mode_probs = np.log(predicted_mode_probabilities) # shape (M,1)
+        log_norm = np.log(normalization) # scalar float
         
-        #Eq 6.33
-        updated_mode_probabilities = mode_loglikelihood*immstate.weights/np.sum(mode_loglikelihood*immstate.weights)
+        # (6.33)
+        # mode_loglikelihood * predicted_mode_probabilities / normalization
+        log_updated_mode_probs = \
+            mode_loglikelihood + log_pred_mode_probs - log_norm
+
+        updated_mode_probabilities = np.exp(log_updated_mode_probs) # shape (M,1)
 
         # Optional debuging
         assert np.all(np.isfinite(updated_mode_probabilities))
@@ -207,7 +236,7 @@ class IMM(Generic[MT]):
     ) -> MixtureParameters[MT]:
         """Update the immstate with z in sensor_state."""
 
-        updated_weights = self.updated_mode_probabilities(z, immstate, sensor_state)
+        updated_weights = self.update_mode_probabilities(z, immstate, sensor_state)
         updated_states = self.mode_matched_update(z,immstate,sensor_state)
 
         updated_immstate = MixtureParameters(updated_weights, updated_states)
@@ -255,22 +284,37 @@ class IMM(Generic[MT]):
         )
 
         # flip conditioning order with Bayes
-        mode_prob, mode_conditioned_component_prob = discretebayes.discrete_bayes(immstate_mixture.weights,component_conditioned_mode_prob) # DONE
+        mode_prob, mode_conditioned_component_prob = \
+            discretebayes.discrete_bayes(weights,
+                                         component_conditioned_mode_prob)
 
         # Hint list_a of lists_b to list_b of lists_a: zip(*immstate_mixture.components)
-        mode_states = None # TODO:
+        mode_states = None # TODO
 
         immstate_reduced = MixtureParameters(mode_prob, mode_states)
 
         return immstate_reduced
 
-    def estimate(self, immstate: MixtureParameters[MT]) -> GaussParams:
+    def estimate(self, immstate: MixtureParameters[MT]
+    ) -> GaussParams:
         """Calculate a state estimate with its covariance from immstate"""
 
         # ! You can assume all the modes have the same reduce and estimate function
         # ! and use eg. self.filters[0] functionality
-        data_reduced = None# TODO
-        estimate = None # TODO
+        #data_reduced = None  # what should this variable represent?
+
+        # make all components' mean and cov into their own separate lists
+        means = []
+        covs = []
+        for comp in immstate.components:
+            means.append(comp.mean)
+            covs.append(comp.cov)
+        means = np.array(means)
+        covs = np.array(covs)
+
+        mean_reduced, cov_reduced = gaussian_mixture_moments(
+            immstate.weights, means, covs)
+        estimate = GaussParams(mean_reduced, cov_reduced)
         return estimate
 
     def gate(

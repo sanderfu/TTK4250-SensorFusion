@@ -29,10 +29,8 @@ def gaussian_mixture_moments(
     # Optional calc: mean_diff =
     mean_diff = mean-mean_bar #Tested this method with a matrix of mockmeans and a mockavg
     #cov_ext = np.average(mean_diff.T@mean_diff,axis=0,weights=w)  # DID NOT GET THIS WAY TO WORK
-    cov_ext = np.zeros(shape=cov[0,:,:].shape)
-    for i in range(np.size(mean,axis=0)):
-        mean_diff_i = mean[i,:]-mean_bar
-        cov_ext += w[i]*(mean_diff[i,:].T@mean_diff[i,:])
+    cov_ext = mean_diff.T @ np.diag(w) @ mean_diff
+    # shapes:    (n, N)   @   (N, N)   @  (N, n)  = (n, n)
     """
     Comment to understand the code above: Had to take mean_diff.T@mean_diff instead of mean_diff@mean_diff.T
     which is in the formula 6.21 because we have row mean vectors and the equation assumes column vectors.

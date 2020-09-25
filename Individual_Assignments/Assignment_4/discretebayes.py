@@ -14,17 +14,17 @@ def discrete_bayes(
     """Swap which discrete variable is the marginal and conditional."""
 
     #Nominator of eq 6.27 (Shape: M X M)
-    joint = cond_pr*pr
+    joint = cond_pr * pr.reshape((-1, 1))  # -1 is inferred dimension
 
     #Denominator of eq. 6.27, the normalization constant (Shape: M X 1)
-    marginal = np.sum(joint,axis=1)
+    marginal = cond_pr.T @ pr
 
     # Take care of rare cases of degenerate zero marginal,
     #eq 6.26 (M x M)
     conditional = joint/marginal
 
     # flip axes?? (n, m) -> (m, n)
-    # conditional = conditional.T
+    conditional = conditional.T
 
     # optional DEBUG
     assert np.all(
