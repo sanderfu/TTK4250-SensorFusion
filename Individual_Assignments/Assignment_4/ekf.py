@@ -95,6 +95,7 @@ class EKF:
         R = self.sensor_model.R(x, sensor_state=sensor_state, z=z)
         S = H @ P @ H.T + R
 
+        assert np.allclose(S, S.T), "S not symmetric"
         return S
 
     def innovation(
@@ -126,7 +127,10 @@ class EKF:
         W = P @ la.solve(S, H).T
 
         x_upd = x + W @ v
-        P_upd = P - W @ H @ P
+        # P_upd = P - W @ H @ P
+        I = np.eye(*P.shape)
+        R = self.sensor_model.R(x, sensor_state=sensor_state, z=z)
+        P_upd = (I - W @ H) @ P @ (I - W @ H).T + W @ R @ W.T
 
         ekfstate_upd = GaussParams(x_upd, P_upd)
 

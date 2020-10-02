@@ -81,10 +81,15 @@ ax1.legend()
 # %% tune single filters
 
 # parameters
-sigma_z = 3
-sigma_a_CV = 0.3
-sigma_a_CT = 0.1
-sigma_omega = 0.002 * np.pi
+## for measure model
+sigma_z = 2.8
+
+## for CV model
+sigma_a_CV = 0.17
+
+## for CT model
+sigma_a_CT = 0.17
+sigma_omega = 0.00015 * np.pi
 
 # initial values
 init_mean = np.array([0, 0, 2, 0, 0])
@@ -166,7 +171,7 @@ CIANIS = np.array(scipy.stats.chi2.interval(0.9, K * 2)) / K
 print(f"ANIS={ANIS} with CIANIS={CIANIS}")
 
 
-# plot
+# plot individual estimates
 fig2, axs2 = plt.subplots(2, 2, num=2, clear=True)
 for axu, axl, u_s, rmse_pred, rmse_upd in zip(
     axs2[0], axs2[1], upd, RMSE_pred, RMSE_upd
@@ -175,32 +180,62 @@ for axu, axl, u_s, rmse_pred, rmse_upd in zip(
     x = np.array([data.mean for data in u_s])
     axu.plot(*x.T[:2])
     rmsestr = ", ".join(f"{num:.3f}" for num in (*rmse_upd, *rmse_pred))
-    axu.set_title(f"RMSE(p_u, v_u, p_pr, v_pr)|\n{rmsestr}|")
-    axu.axis("equal")
+    axu.set_title(f"RMSE(p_u, v_u, p_pr, v_pr)\n{rmsestr}", fontsize=8)
+    #axu.axis("equal")
+    axu.set_xlabel('X')
+    axu.set_ylabel('Y', rotation=0)
+
     if x.shape[1] >= 5:
         axl.plot(np.arange(K) * Ts, x.T[4])
     axl.plot(np.arange(K) * Ts, Xgt[:, 4])
+    axl.set_xlabel('time step')
 
-axs2[1, 0].set_ylabel(r"$\omega$")
+axs2[1, 0].set_ylabel(r"$\omega$", rotation=0)
+axs2[0, 0].legend(['CV'])
+axs2[0, 1].legend(['CT'])
+fig2.tight_layout(w_pad=0.5, h_pad=1.0)
 
+# plot predicted vs ground truth
+fig7, axs7 = plt.subplots(1, 2, num=7, clear=True,dpi=400)
+fig7.suptitle("Model predictions vs ground truth")
+
+axs7[0].plot(*Xgt.T[:2], label="Ground truth")
+x_CV = np.array([data.mean for data in upd[0]])
+axs7[0].plot(*x_CV.T[:2], '--r', label="CV model")
+axs7[0].legend(fontsize=6)
+
+axs7[1].plot(*Xgt.T[:2], label="Ground truth")
+x_CT = np.array([data.mean for data in upd[1]])
+axs7[1].plot(*x_CT.T[:2], '--r', label="CT model")
+axs7[1].legend(fontsize=6)
+
+# plot errors
 fig3, axs3 = plt.subplots(1, 3, num=3, clear=True)
+fig3.subplots_adjust(wspace=0.4)
 
-axs3[0].plot(np.arange(K) * Ts, NIS[0])
-axs3[0].plot(np.arange(K) * Ts, NIS[1])
+axs3[0].plot(np.arange(K) * Ts, NIS[0], label='CV')
+axs3[0].plot(np.arange(K) * Ts, NIS[1], label='CT')
+for ci, anis, lab in zip(CIANIS, ANIS, ['CV', 'CT']):
+    axs3[0].plot(np.arange(K) * Ts, ci * np.ones((K,)), '--r', label=f'CI_{lab}')
+    axs3[0].plot(np.arange(K) * Ts, anis * np.ones((K,)), '--g', label=f"ANIS_{lab}")
 axs3[0].set_title("NIS")
+axs3[0].set_xlabel('Time step')
+axs3[0].legend(fontsize=6, bbox_to_anchor=(-0.3,1))
 
 axs3[1].plot(np.arange(K) * Ts, err_upd[:, 0].T)
 # axs3[1].plot(np.arange(K) * Ts, err_upd[1, :, 0])
-axs3[1].set_title("pos error")
+axs3[1].set_title("pos error (gt)")
+axs3[1].set_xlabel('Time step')
 
 axs3[2].plot(np.arange(K) * Ts, err_upd[:, 1].T)
 # axs3[2].plot(np.arange(K) * Ts, err_upd[1, :, 1])
-axs3[2].set_title("vel error")
+axs3[2].set_title("vel error (gt)")
+axs3[2].set_xlabel('Time step')
 
 # %% tune IMM by only looking at the measurements
-sigma_z = 3
-sigma_a_CV = 0.2
-sigma_a_CT = 0.1
+sigma_z = 2.9
+sigma_a_CV = 0.1
+sigma_a_CT = 0.2
 sigma_omega = 0.002 * np.pi
 PI = np.array([[0.95, 0.05], [0.05, 0.95]])
 assert np.allclose(PI.sum(axis=1), 1), "rows of PI must sum to 1"
@@ -247,15 +282,19 @@ CINIS = np.array(scipy.stats.chi2.interval(0.9, 2))
 CIANIS = np.array(scipy.stats.chi2.interval(0.9, 2 * K)) / K
 print(f"ANIS={ANIS} with CIANIS={CIANIS}")
 
-# plot
-fig4, axs4 = plt.subplots(2, 2, num=4, clear=True)
+#%% plot imm
+fig4, axs4 = plt.subplots(2, 2, num=4, clear=True, dpi=400)
+
 axs4[0, 0].plot(*x_est.T[:2], label="est", color="C0")
-axs4[0, 0].scatter(*Z.T, label="z", color="C1")
-axs4[0, 0].legend()
+axs4[0, 0].scatter(*Z.T, label="z", color="C1", s=4)
+axs4[0, 0].legend(fontsize=8)
+
 axs4[0, 1].plot(np.arange(K) * Ts, x_est[:, 4], label=r"$\omega$")
-axs4[0, 1].legend()
+axs4[0, 1].legend(fontsize=8)
+
 axs4[1, 0].plot(np.arange(K) * Ts, prob_est, label=r"$Pr(s)$")
-axs4[1, 0].legend()
+axs4[1, 0].legend([r"$Pr(CV)$", r"$Pr(CT)$"], fontsize=4)
+
 axs4[1, 1].plot(np.arange(K) * Ts, NIS, label="NIS")
 axs4[1, 1].plot(np.arange(K) * Ts, NISes)
 
@@ -264,10 +303,20 @@ CI_LABELS = ["CI0", "CI1"]
 for ci, cilbl in zip(CINIS, CI_LABELS):
     axs4[1, 1].plot([1, K * Ts], np.ones(2) * ci, "--r", label=cilbl)
 axs4[1, 1].text(K * Ts * 1.1, 1, f"{ratio_in_CI} inside CI", rotation=90)
-axs4[1, 1].legend()
+axs4[1, 1].legend(fontsize=6)
+
+fig4.subplots_adjust(wspace=0.25, hspace=0.4)
+
+# plot predicted vs ground truth
+fig8, ax8 = plt.subplots(1, num=8, clear=True)
+fig8.suptitle("IMM predictions vs ground truth")
+
+ax8.plot(*Xgt.T[:2], label="Ground truth")
+ax8.plot(*x_est.T[:2], '--r', label="IMM model")
+ax8.legend(fontsize=6)
 
 # %% tune IMM by looking at ground truth
-sigma_z = 3
+sigma_z = 1.7
 sigma_a_CV = 0.2
 sigma_a_CT = 0.1
 sigma_omega = 0.002 * np.pi
