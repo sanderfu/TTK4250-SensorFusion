@@ -111,7 +111,7 @@ for k, Zk in enumerate(Z):
 sigma_a = 2.5
 sigma_z = 2
 
-PD = 0.995  # TODO
+PD = 0.95  # TODO
 clutter_intensity = 1e-5  # TODO
 gate_size = np.power(3.1,2)  # TODO
 
@@ -160,12 +160,6 @@ posRMSE = np.sqrt(np.mean(pos_norms**2, axis=0))
 velRMSE = np.sqrt(np.mean(vel_norms**2, axis=0))
 print(f"posRMSE = {posRMSE:.2f}, velRMSE = {velRMSE:.2f}")
 
-ANEES = np.mean(NEES)
-ANEESpos = np.mean(NEESpos)
-ANEESvel = np.mean(NEESvel)
-print(f"ANEES = {ANEES:.3f}, ANEESpos = {ANEESpos:.3f}, ANEESvel = {ANEESvel:.3f}")
-
-
 
 # %% plots
 fig3, ax3 = plt.subplots(num=3, clear=True,dpi=250)
@@ -177,9 +171,9 @@ ax3.set_title(
 
 fig4, axs4 = plt.subplots(3, sharex=True, num=4, clear=True,dpi=250)
 
-confprob = None # TODO: probability for confidence interval
-CI2 = None # TODO: confidence interval for NEESpos and NEESvel
-CI4 = None # TODO: confidence interval for NEES
+confprob = 0.95 # TODO: probability for confidence interval
+CI2 = np.asarray(scipy.stats.chi2.interval(confprob, 2)) # TODO: confidence interval for NEESpos and NEESvel
+CI4 = np.asarray(scipy.stats.chi2.interval(confprob, 4)) # TODO: confidence interval for NEES
 
 axs4[0].plot(np.arange(K) * Ts, NEESpos)
 axs4[0].plot([0, (K - 1) * Ts], np.repeat(CI2[None], 2, 0), "--r")
@@ -199,12 +193,12 @@ axs4[2].set_ylabel("NEES")
 inCI = np.mean((CI2[0] <= NEES) * (NEES <= CI2[1]))
 axs4[2].set_title(f"{inCI*100:.1f}% inside {confprob*100:.1f}% CI")
 
-confprob = None# TODO
-CI2K = None# TODO: ANEESpos and ANEESvel
-CI4K = None# TODO: NEES
-ANEESpos = None# TODO
-ANEESvel = None# TODO
-ANEES = None# TODO
+confprob = 0.95 # TODO
+CI2K = np.asarray(scipy.stats.chi2.interval(confprob, K*2))/K# TODO: ANEESpos and ANEESvel
+CI4K = np.asarray(scipy.stats.chi2.interval(confprob, K*4))/K# TODO: NEES
+ANEESpos = np.mean(NEESpos)# TODO
+ANEESvel = np.mean(NEESvel)# TODO
+ANEES = np.mean(NEES)# TODO
 print(f"ANEESpos = {ANEESpos:.2f} with CI = [{CI2K[0]:.2f}, {CI2K[1]:.2f}]")
 print(f"ANEESvel = {ANEESvel:.2f} with CI = [{CI2K[0]:.2f}, {CI2K[1]:.2f}]")
 print(f"ANEES = {ANEES:.2f} with CI = [{CI4K[0]:.2f}, {CI4K[1]:.2f}]")
