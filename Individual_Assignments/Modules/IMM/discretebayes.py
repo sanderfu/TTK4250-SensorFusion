@@ -20,8 +20,13 @@ def discrete_bayes(
     marginal = cond_pr.T @ pr
 
     # Take care of rare cases of degenerate zero marginal,
-    #eq 6.26 (M x M)
-    conditional = joint/marginal
+    # eq 6.26 (M x M)
+    conditional = np.divide(
+    joint,
+    marginal[None],
+    out=np.repeat(pr[:, None], joint.shape[1], 1),
+    where=marginal[None] > 0,
+    )
 
     # flip axes?? (n, m) -> (m, n)
     conditional = conditional.T

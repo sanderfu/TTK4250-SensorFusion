@@ -129,12 +129,19 @@ class EKF:
         v, S = self.innovation(z, ekfstate, sensor_state=sensor_state)
 
         H = self.sensor_model.H(x, sensor_state=sensor_state)
+        #Comment: la.solve(S,H) = H@inv(S) (Could also use H@la.inv(S))
         W = P @ la.solve(S, H).T
 
         x_upd = x + W @ v
+        
+        #The default theoretical way of updating covariance matrix 
+        #In practice not very stable numerically
         # P_upd = P - W @ H @ P
+        
         I = np.eye(*P.shape)
         R = self.sensor_model.R(x, sensor_state=sensor_state, z=z)
+        
+        #Using the Joseph form (Eq. 4.10) for the posteriori covariance matrix
         P_upd = (I - W @ H) @ P @ (I - W @ H).T + W @ R @ W.T
 
         ekfstate_upd = GaussParams(x_upd, P_upd)

@@ -15,8 +15,7 @@ from typing import (
 )
 from mixturedata import MixtureParameters
 from gaussparams import GaussParams
-from ekf import EKF as StateEstimator
-#from estimatorduck import StateEstimator
+from estimatorduck import StateEstimator
 from mixturereduction import gaussian_mixture_moments
 
 # packages
@@ -36,7 +35,7 @@ MT = TypeVar("MT")  # a type variable to be the mode type
 @dataclass
 class IMM(Generic[MT]):
     # The M filters the IMM relies on
-    filters: List[StateEstimator]
+    filters: List[StateEstimator[MT]]
     # the transition matrix. PI[i, j] = probability of going from model i to j: shape (M, M)
     PI: np.ndarray
     # init mode probabilities if none is given
