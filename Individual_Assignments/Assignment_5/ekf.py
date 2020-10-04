@@ -180,7 +180,7 @@ class EKF:
         ekfstate in sensor_state """
 
         # a function to be used in PDA and IMM-PDA
-        gated = self.NIS(z,ekfstate,sensor_state)<gate_size_square
+        gated = self.NIS(z,ekfstate,sensor_state=sensor_state)<gate_size_square
         return gated
 
     @classmethod

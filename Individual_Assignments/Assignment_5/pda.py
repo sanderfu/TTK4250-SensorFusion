@@ -4,7 +4,7 @@ import numpy as np
 import scipy
 import scipy.special
 
-from ekf import EKF as StateEstimator
+from estimatorduck import StateEstimator
 from mixturedata import MixtureParameters
 from gaussparams import GaussParams
 
@@ -39,9 +39,9 @@ class PDA(Generic[ET]):  # Probabilistic Data Association
         # The loop can be done using ether of these: normal loop, list comprehension or map
         gated = []  # TODO: some for loop over elements of Z using self.state_filter.gate
         for z_row in Z:
-            gated.append(self.state_filter.gate(z_row,filter_state,sensor_state,g_squared))
+            gated.append(self.state_filter.gate(z_row,filter_state,sensor_state=sensor_state,gate_size_square=g_squared))
             
-        gated = gated.reshape(M)
+        gated = np.array(gated)
         return gated
 
     def loglikelihood_ratios(
@@ -132,14 +132,14 @@ class PDA(Generic[ET]):  # Probabilistic Data Association
         Gate -> association probabilities -> conditional update -> reduce mixture.
         """
         # remove the not gated measurements from consideration
-        gated = self.gate(Z,filter_state,sensor_state)
+        gated = self.gate(Z,filter_state,sensor_state=sensor_state)
         Zg = Z[gated]
 
         # find association probabilities
-        beta = self.association_probabilities(Zg,filter_state,sensor_state)
+        beta = self.association_probabilities(Zg,filter_state,sensor_state=sensor_state)
 
         # find the mixture components
-        filter_state_updated_mixture_components = self.conditional_update(Zg,filter_state,sensor_state)
+        filter_state_updated_mixture_components = self.conditional_update(Zg,filter_state,sensor_state=sensor_state)
 
         # make mixture
         filter_state_update_mixture = MixtureParameters(
@@ -173,7 +173,7 @@ class PDA(Generic[ET]):  # Probabilistic Data Association
     def init_filter_state(
         self,
         # need to have the type required by the specified state_filter
-        init_state: "GaussParams",
+        init_state: "ET",
     ) -> ET:
         """Initialize a filter state to proper form."""
         return self.state_filter.init_filter_state(init_state)

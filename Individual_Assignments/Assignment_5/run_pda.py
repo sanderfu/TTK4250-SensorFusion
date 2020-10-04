@@ -76,7 +76,7 @@ else:
 # %%
 
 # plot measurements close to the trajectory
-fig1, ax1 = plt.subplots(num=1, clear=True)
+fig1, ax1 = plt.subplots(num=1, clear=True,dpi=250)
 
 Z_plot_data = np.empty((0, 2), dtype=float)
 plot_measurement_distance = 45
@@ -108,12 +108,12 @@ for k, Zk in enumerate(Z):
     plt.pause(plotpause)
 """
 # %%
-sigma_a = 7 # Tuning in progress (Currently using value from assignment 3)
-sigma_z = 1 # Tuning in progress (---"---)
+sigma_a = 2.5
+sigma_z = 2
 
-PD = 0.8 # TODO
-clutter_intensity = 1e-3 # TODO
-gate_size = 5^2 # TODO
+PD = 0.995  # TODO
+clutter_intensity = 1e-5  # TODO
+gate_size = np.power(3.1,2)  # TODO
 
 dynamic_model = dynamicmodels.WhitenoiseAccelleration(sigma_a)
 measurement_model = measurementmodels.CartesianPosition(sigma_z)
@@ -168,14 +168,14 @@ print(f"ANEES = {ANEES:.3f}, ANEESpos = {ANEESpos:.3f}, ANEESvel = {ANEESvel:.3f
 
 
 # %% plots
-fig3, ax3 = plt.subplots(num=3, clear=True)
+fig3, ax3 = plt.subplots(num=3, clear=True,dpi=250)
 ax3.plot(*x_hat.T[:2], label=r"$\hat x$")
 ax3.plot(*Xgt.T[:2], label="$x$")
 ax3.set_title(
     rf"$\sigma_a = {sigma_a:.3f}$, \sigma_z = {sigma_z:.3f}, posRMSE = {posRMSE:.2f}, velRMSE = {velRMSE:.2f}"
 )
 
-fig4, axs4 = plt.subplots(3, sharex=True, num=4, clear=True)
+fig4, axs4 = plt.subplots(3, sharex=True, num=4, clear=True,dpi=250)
 
 confprob = None # TODO: probability for confidence interval
 CI2 = None # TODO: confidence interval for NEESpos and NEESvel
