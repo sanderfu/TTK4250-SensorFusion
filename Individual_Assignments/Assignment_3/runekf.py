@@ -1,6 +1,6 @@
 # %% Imports
 from gaussparams import GaussParams
-import measurmentmodels
+import measurementmodels
 import dynamicmodels
 import ekf
 import scipy
@@ -102,7 +102,7 @@ sigma_z = 1 # Tuning DONE
 
 # create the model and estimator object
 dynmod = dynamicmodels.WhitenoiseAccelleration(sigma_a)
-measmod = measurmentmodels.CartesianPosition(sigma_z)
+measmod = measurementmodels.CartesianPosition(sigma_z)
 ekf_filter = ekf.EKF(dynmod, measmod)
 print(ekf_filter)  # make use of the @dataclass automatic repr
 
@@ -189,7 +189,7 @@ for i, sigma_a in enumerate(sigma_a_list):
         
     for j, sigma_z in enumerate(sigma_z_list):
         
-        measmod = measurmentmodels.CartesianPosition(sigma_z)  # DONE
+        measmod = measurementmodels.CartesianPosition(sigma_z)  # DONE
         # initialize mean and covariance
         # DONE
         z_vec = np.array([Z[0,:],Z[1,:]]).reshape(4,1)

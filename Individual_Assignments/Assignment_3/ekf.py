@@ -21,8 +21,11 @@ import scipy
 
 # local
 import dynamicmodels as dynmods
-import measurmentmodels as measmods
+import measurementmodels as measmods
 from gaussparams import GaussParams, GaussParamList
+from mixturedata import MixtureParameters
+import mixturereduction
+from singledispatchmethod import singledispatchmethod
 
 # %% The EKF
 
@@ -53,8 +56,11 @@ class EKF:
         Q = self.dynamic_model.Q(x, Ts)
 
         x_pred = self.dynamic_model.f(x,Ts)
+        
+        #Predicted covariance matrix. Using definitin from Algorithm 1 p. 54
         P_pred = F@P@F.T+Q  # DONE
-
+        
+        #Packing predicted mean and predicted covariance matrix into GaussParams object.
         state_pred = GaussParams(x_pred, P_pred)
 
         return state_pred
@@ -69,13 +75,12 @@ class EKF:
         """Calculate the innovation mean for ekfstate at z in sensor_state."""
 
         x = ekfstate.mean
+
+        #Predicted measurement (Algorithm 1 p.54)
+        zbar = self.sensor_model.h(x)
         
-        #My code below
-        H = self.sensor_model.H(x)
-
-        zbar = self.sensor_model.h(x)  # DONE predicted measurement
-
-        v = z-zbar  # DONE the innovation
+        #Innovation (Algorithm 1 p.54)
+        v = z-zbar
 
         return v
 
@@ -87,11 +92,15 @@ class EKF:
                        ) -> np.ndarray:
         """Calculate the innovation covariance for ekfstate at z in sensorstate."""
 
+        #Tuple unpacking
         x, P = ekfstate
-
+        
+        
         H = self.sensor_model.H(x, sensor_state=sensor_state)
         R = self.sensor_model.R(x, sensor_state=sensor_state, z=z)
-        S = H@P@H.T+R  # DONE the innovation covariance
+        
+        #Innovation covariance (Algorithm 1, p.54)
+        S = H@P@H.T+R
 
         return S
 
@@ -103,7 +112,6 @@ class EKF:
                    ) -> GaussParams:
         """Calculate the innovation for ekfstate at z in sensor_state."""
 
-        # DONE: reuse the above functions for the innovation and its covariance
         v = self.innovation_mean(z,ekfstate)
         S = self.innovation_cov(z,ekfstate)
 
@@ -117,17 +125,22 @@ class EKF:
                sensor_state: Dict[str, Any] = None
                ) -> GaussParams:
         """Update ekfstate with z in sensor_state"""
-
+        
+        #Tuple unpacking of prediction
         x, P = ekfstate
 
         v, S = self.innovation(z, ekfstate, sensor_state=sensor_state)
 
         H = self.sensor_model.H(x, sensor_state=sensor_state)
-        W = P@H.T@la.inv(S)  # DONE: the kalman gain, Hint: la.solve, la.inv
+        
+        #Calculate the Kalman Gain (Algorithm 1, p. 54)
+        W = P@H.T@la.inv(S)
 
-        x_upd = x+W@v  # DONE the mean update
-        P_upd = (np.eye(4)-W@H)@P   # DONE: the covariance update
+        #The mean and covariance update (Algorithm 1, p. 54)
+        x_upd = x+W@v
+        P_upd = (np.eye(4)-W@H)@P
 
+        #Tuple packing
         ekfstate_upd = GaussParams(x_upd, P_upd)
 
         return ekfstate_upd
@@ -142,9 +155,9 @@ class EKF:
              ) -> GaussParams:
         """Predict ekfstate Ts units ahead and then update this prediction with z in sensor_state."""
 
-        # DONE: resue the above functions
-        ekfstate_pred = self.predict(ekfstate,Ts)  # DONE
-        ekfstate_upd = self.update(z,ekfstate_pred)  # DONE
+        ekfstate_pred = self.predict(ekfstate,Ts)
+        ekfstate_upd = self.update(z,ekfstate_pred)
+        
         return ekfstate_upd
 
     def NIS(self,
@@ -157,7 +170,8 @@ class EKF:
 
         v, S = self.innovation(z, ekfstate, sensor_state=sensor_state)
 
-        NIS = v.T@la.inv(S)@v  # DONE
+        #Equation 4.66 p.67
+        NIS = v.T@la.inv(S)@v
 
         return NIS
 
@@ -171,8 +185,11 @@ class EKF:
 
         x, P = ekfstate
 
-        x_diff = x-x_true  # DONE Optional step
-        NEES = x_diff.T@la.inv(P)@x_diff  # DONE
+        x_diff = x-x_true
+        
+        #Equation 4.65 p. 67
+        NEES = x_diff.T@la.inv(P)@x_diff
+        
         return NEES
 
     def gate(self,
@@ -182,26 +199,44 @@ class EKF:
              sensor_state: Dict[str, Any],
              gate_size_square: float,
              ) -> bool:
-        """ Check if z is inside sqrt(gate_sized_squared)-sigma ellipse of ekfstate in sensor_state """
+        """Check if z is inside sqrt(gate_sized_squared)-sigma ellipse of
+        ekfstate in sensor_state """
 
-        # a function to be used in PDA and IMM-PDA
-        gated = None  # TODO in PDA exercise
+        #Equation unnumbered, page 116.
+        gated = self.NIS(z,ekfstate,sensor_state=sensor_state)<gate_size_square
         return gated
 
-    def loglikelihood(self,
-                      z: np.ndarray,
-                      ekfstate: GaussParams,
-                      sensor_state: Dict[str, Any] = None
-                      ) -> float:
-        """Calculate the log likelihood of ekfstate at z in sensor_state"""
-        # we need this function in IMM, PDA and IMM-PDA exercises
-        # not necessary for tuning in EKF exercise
-        """The likelihood function is p(z|x)"""
+    def loglikelihood(
+        self,
+        z: np.ndarray,
+        ekfstate: GaussParams,
+        sensor_state: Optional[Dict[str, Any]] = None,
+    ) -> float:
+        """Calculate the log likelihood of ekfstate at z in sensor_state
+            Comment: This function was retrieved from Blackboard.
+            Comment2: What they ask for here is log(p(z|x_k(posteriori))) for a 
+            realization of z. I should modify this function to allow for using 
+            a method that makes me understand better what is going on.
+            Comment3: For completeness, realize that likelihood function is 
+            the same thign as the measurement function (Eq. 4.6)
+        """
+    
         v, S = self.innovation(z, ekfstate, sensor_state=sensor_state)
-
-        # TODO: log likelihood, Hint: log(N(v, S))) -> NIS, la.slogdet.
-        ll = None
-
+    
+        cholS = la.cholesky(S, lower=True)
+    
+        invcholS_v = la.solve_triangular(cholS, v, lower=True)
+        NISby2 = (invcholS_v ** 2).sum() / 2
+        # alternative self.NIS(...) /2 or v @ la.solve(S, v)/2
+    
+        logdetSby2 = np.log(cholS.diagonal()).sum()
+        # alternative use la.slogdet(S)
+    
+        ll = -(NISby2 + logdetSby2 + self._MLOG2PIby2)
+    
+        # simplest overall alternative
+        # ll = scipy.stats.multivariate_normal.logpdf(v, cov=S)
+    
         return ll
 
     @classmethod
@@ -353,5 +388,48 @@ class EKF:
 
         return stats_arr
 
+    def reduce_mixture(
+        self, ekfstate_mixture: MixtureParameters[GaussParams]
+    ) -> GaussParams:
+        """Merge a Gaussian mixture into single mixture"""
+        w = ekfstate_mixture.weights
+        x = np.array([c.mean for c in ekfstate_mixture.components], dtype=float)
+        P = np.array([c.cov for c in ekfstate_mixture.components], dtype=float)
+        x_reduced, P_reduced = mixturereduction.gaussian_mixture_moments(w, x, P)
+        return GaussParams(x_reduced, P_reduced)
+    
+    @singledispatchmethod
+    def init_filter_state(self, init) -> None:
+        raise NotImplementedError(
+            f"EKF do not know how to make {init} into GaussParams"
+        )
+    
+    @init_filter_state.register(GaussParams)
+    def _(self, init: GaussParams) -> GaussParams:
+        return init
+    
+    @init_filter_state.register(tuple)
+    @init_filter_state.register(list)
+    def _(self, init: Union[Tuple, List]) -> GaussParams:
+        return GaussParams(*init)
+    
+    @init_filter_state.register(dict)
+    def _(self, init: dict) -> GaussParams:
+        got_mean = False
+        got_cov = False
+    
+        for key in init:
+            if not got_mean and key in ["mean", "x", "m"]:
+                mean = init[key]
+                got_mean = True
+            if not got_cov and key in ["cov", "P"]:
+                cov = init[key]
+                got_cov = True
+    
+        assert (
+            got_mean and got_cov
+        ), f"EKF do not recognize mean and cov keys in the dict {init}."
+    
+        return GaussParams(mean, cov)
 
 # %% End
