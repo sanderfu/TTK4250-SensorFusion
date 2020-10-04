@@ -1,4 +1,10 @@
 #%%
+import sys
+sys.path.append('../Modules/EKF')
+sys.path.append('../Modules/PDA')
+sys.path.append('../Modules/Models')
+sys.path.append('../Modules/Utilities')
+
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
