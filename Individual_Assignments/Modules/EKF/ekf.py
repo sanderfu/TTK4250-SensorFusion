@@ -119,28 +119,24 @@ class EKF:
 
         return innovationstate
 
-    def update(self,
-               z: np.ndarray,
-               ekfstate: GaussParams,
-               sensor_state: Dict[str, Any] = None
-               ) -> GaussParams:
+    def update(
+        self, z: np.ndarray, ekfstate: GaussParams, sensor_state: Dict[str, Any] = None
+    ) -> GaussParams:
         """Update ekfstate with z in sensor_state"""
-        
-        #Tuple unpacking of prediction
+
         x, P = ekfstate
 
         v, S = self.innovation(z, ekfstate, sensor_state=sensor_state)
 
         H = self.sensor_model.H(x, sensor_state=sensor_state)
-        
-        #Calculate the Kalman Gain (Algorithm 1, p. 54)
-        W = P@H.T@la.inv(S)
+        W = P @ la.solve(S, H).T
 
-        #The mean and covariance update (Algorithm 1, p. 54)
-        x_upd = x+W@v
-        P_upd = (np.eye(4)-W@H)@P
+        x_upd = x + W @ v
+        # P_upd = P - W @ H @ P
+        I = np.eye(*P.shape)
+        R = self.sensor_model.R(x, sensor_state=sensor_state, z=z)
+        P_upd = (I - W @ H) @ P @ (I - W @ H).T + W @ R @ W.T
 
-        #Tuple packing
         ekfstate_upd = GaussParams(x_upd, P_upd)
 
         return ekfstate_upd

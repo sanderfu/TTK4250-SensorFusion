@@ -1,4 +1,10 @@
 # %% imports
+import sys
+sys.path.append('../Modules/EKF')
+sys.path.append('../Modules/IMM')
+sys.path.append('../Modules/Models')
+sys.path.append('../Modules/Utilities')
+
 import numpy as np
 import scipy
 import scipy.io

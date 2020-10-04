@@ -11,14 +11,21 @@ import numpy as np
 class MeasurementModel(Protocol):
     m: int
 
-    def h(self, x: np.ndarray, *,
-          sensor_state: Dict[str, Any] = None) -> np.ndarray: ...
+    def h(self, x: np.ndarray, *, sensor_state: Dict[str, Any] = None) -> np.ndarray:
+        ...
 
-    def H(self, x: np.ndarray, *,
-          sensor_state: Dict[str, Any] = None) -> np.ndarray: ...
+    def H(self, x: np.ndarray, *, sensor_state: Dict[str, Any] = None) -> np.ndarray:
+        ...
 
-    def R(self, x: np.ndarray, *,
-          sensor_state: Dict[str, Any] = None, z: np.ndarray = None) -> np.ndarray: ...
+    def R(
+        self,
+        x: np.ndarray,
+        *,
+        sensor_state: Dict[str, Any] = None,
+        z: np.ndarray = None,
+    ) -> np.ndarray:
+        ...
+
 
 # %% Models
 
@@ -27,39 +34,41 @@ class MeasurementModel(Protocol):
 class CartesianPosition:
     sigma: float
     m: int = 2
-    state_dim: int = 4
+    state_dim: Optional[int] = None
+    pos_idx: Optional[Sequence[int]] = None
 
-    def h(self,
-            x: np.ndarray,
-            *,
-            sensor_state: Dict[str, Any] = None,
-          ) -> np.ndarray:
+    _H: np.ndarray = field(init=False, repr=False)
+    _R: np.ndarray = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self.state_dim = self.state_dim or 2 * self.m
+        self.pos_idx = np.asarray(self.pos_idx or np.arange(self.m), dtype=int)
+
+        # H is a constant matrix so simply store it:
+        # same as eye(m, state_dim) for pos_idx = 0:dim
+        self._H = np.zeros((self.m, self.state_dim))
+        self._H[self.pos_idx, self.pos_idx] = 1
+
+        # R is a constant so store it
+        self._R = self.sigma ** 2 * np.eye(self.m)
+
+    def h(self, x: np.ndarray, *, sensor_state: Dict[str, Any] = None,) -> np.ndarray:
         """Calculate the noise free measurement location at x in sensor_state."""
-        # TODO
-        # x[0:2] is position
-        # you do not need to care about sensor_state
-        return self.H(x)@x
+        if sensor_state is not None:
+            return x[: self.m] - sensor_state["pos"]
+        else:
+            return x[: self.m]
 
-    def H(self,
-            x: np.ndarray,
-            *,
-            sensor_state: Dict[str, Any] = None,
-          ) -> np.ndarray:
+    def H(self, x: np.ndarray, *, sensor_state: Dict[str, Any] = None,) -> np.ndarray:
         """Calculate the measurement Jacobian matrix at x in sensor_state."""
-        # TODO
-        # x[0:2] is position
-        # you do not need to care about sensor_state
-        # if you need the size of the state dimension it is in self.state_dim
-        return np.array([[1,0,0,0],[0,1,0,0]])
+        return self._H
 
-    def R(self,
-            x: np.ndarray,
-            *,
-            sensor_state: Dict[str, Any] = None,
-            z: np.ndarray = None,
-          ) -> np.ndarray:
+    def R(
+        self,
+        x: np.ndarray,
+        *,
+        sensor_state: Dict[str, Any] = None,
+        z: np.ndarray = None,
+    ) -> np.ndarray:
         """Calculate the measurement covariance matrix at x in sensor_state having potentially received measurement z."""
-        # TODO
-        # you do not need to care about sensor_state
-        # sigma is available as self.sigma, and @dataclass makes it available in the init class constructor
-        return np.eye(2)*self.sigma**2
+        return self._R
