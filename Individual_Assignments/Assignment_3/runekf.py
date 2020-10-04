@@ -1,4 +1,9 @@
 # %% Imports
+import sys
+sys.path.append('../Modules/EKF')
+sys.path.append('../Modules/Models')
+sys.path.append('../Modules/Utilities')
+
 from gaussparams import GaussParams
 import measurementmodels
 import dynamicmodels
