@@ -108,8 +108,8 @@ for k, Zk in enumerate(Z):
     plt.pause(plotpause)
 """
 # %%
-sigma_a = 2.5
-sigma_z = 2
+sigma_a = 3.5
+sigma_z = 2.5
 
 PD = 0.95  # TODO
 clutter_intensity = 1e-5  # TODO

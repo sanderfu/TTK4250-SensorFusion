@@ -168,7 +168,7 @@ class PDA(Generic[ET]):  # Probabilistic Data Association
 
     def estimate(self, filter_state: ET) -> GaussParams:
         """Get an estimate with its covariance from the filter state."""
-        return # TODO: remember to use self.state_filter to keep it working for both EKF and IMM
+        return self.state_filter.estimate(filter_state)# TODO: remember to use self.state_filter to keep it working for both EKF and IMM
 
     def init_filter_state(
         self,
