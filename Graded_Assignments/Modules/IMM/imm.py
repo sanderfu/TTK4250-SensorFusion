@@ -330,12 +330,14 @@ class IMM(Generic[MT]):
         self,
         z: np.ndarray,
         immstate: MixtureParameters[MT],
-        gate_size: float,
+        gate_size_square: float,
         sensor_state: Dict[str, Any] = None,
     ) -> bool:
         """Check if z is within the gate of any mode in immstate in sensor_state"""
-
-        gated_per_mode = np.array(self.NISes(z,immstate,sensor_state=sensor_state)<gate_size**2)
+        
+        gated_per_mode = []
+        for NIS in self.NISes(z,immstate,sensor_state=sensor_state):
+            gated_per_mode.append(NIS<gate_size_square)
 
         gated = np.any(gated_per_mode)
         return gated

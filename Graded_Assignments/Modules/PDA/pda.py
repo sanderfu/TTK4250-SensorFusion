@@ -64,7 +64,7 @@ class PDA(Generic[ET]):  # Probabilistic Data Association
         ll[0] =  log_clutter+log_PND
         # TODO: some for loop over elements of Z using self.state_filter.loglikelihood
         for z_row,i in zip(Z,range(1,len(ll))):
-            ll[i]=self.state_filter.loglikelihood(z_row,filter_state,sensor_state)
+            ll[i]=self.state_filter.loglikelihood(z_row,filter_state,sensor_state=sensor_state)
         return ll
 
     def association_probabilities(
