@@ -124,7 +124,7 @@ class IMM(Generic[MT]):
             mixed_states.append(GaussParams(mean,cov))
         
         #After this make sure mixed_states is numpy array
-        mixed_states = np.array(mixed_states)
+        #mixed_states = np.array(mixed_states)
         
         #Return (M,1) vector (one elem for each mode) of GaussParams (mean and cov)
         return mixed_states
@@ -143,7 +143,7 @@ class IMM(Generic[MT]):
             modestates_pred.append(ekf_filter.predict(mode_state,Ts))
             
         #Ensure modestates_pred becomes numpy array
-        modestates_pred = np.array(modestates_pred)
+        #modestates_pred = np.array(modestates_pred)
         
         #Return vector of size (M,...) of Gaussparams for predicted state for
         #every mode (mean and cov)
@@ -165,7 +165,7 @@ class IMM(Generic[MT]):
         # DONE: proposed structure
         predicted_mode_probability, mixing_probability = self.mix_probabilities(immstate,Ts) # DONE
 
-        mixed_mode_states: List[MT] = self.mix_states(immstate,mixing_probability) # DONE
+        mixed_mode_states = self.mix_states(immstate,mixing_probability) # DONE
 
         predicted_mode_states = self.mode_matched_prediction(mixed_mode_states,Ts) # DONE
 
@@ -268,13 +268,13 @@ class IMM(Generic[MT]):
         
         # (6.32), shape = (M,1)
         #Same as conditional_mode_likelihoods (see note in onenote)
-        log_hypothesis_conditional_mode_likelihoods = np.array([filt.loglikelihood(z, comp, sensor_state) for filt, comp in zip(self.filters, immstate.components)])
+        log_hypothesis_conditional_mode_likelihoods = np.array([filt.loglikelihood(z, comp, sensor_state=sensor_state) for filt, comp in zip(self.filters, immstate.components)])
         hypothesis_conditional_mode_likelihoods = np.exp(log_hypothesis_conditional_mode_likelihoods)
         
         #Before elementwise multipliation, ensure both arrays have same dimension.
         predicted_mode_probabilities = predicted_mode_probabilities.reshape((-1,1))
         hypothesis_conditional_mode_likelihoods = hypothesis_conditional_mode_likelihoods.reshape((-1,1))
-        assert predicted_mode_probabilities.shape == hypothesis_conditional_mode_likelihoods.shape
+        assert predicted_mode_probabilities.shape == hypothesis_conditional_mode_likelihoods.shape,"Predicted mode prob. not same shape"
 
         ll = np.log(np.sum(predicted_mode_probabilities*hypothesis_conditional_mode_likelihoods))
         

@@ -149,6 +149,7 @@ mode_probabilities_init = np.array([p10, (1 - p10)])
 mode_states_init = GaussParams(mean_init, cov_init)
 init_imm_state = MixtureParameters(mode_probabilities_init, [mode_states_init] * 2)
 
+
 assert np.allclose(
     np.sum(mode_probabilities_init), 1
 ), "initial mode probabilities must sum to 1"
