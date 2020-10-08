@@ -235,8 +235,8 @@ class IMM(Generic[MT]):
     ) -> MixtureParameters[MT]:
         """Update the immstate with z in sensor_state."""
 
-        updated_weights = self.update_mode_probabilities(z, immstate, sensor_state)
-        updated_states = self.mode_matched_update(z,immstate,sensor_state)
+        updated_weights = self.update_mode_probabilities(z, immstate, sensor_state=sensor_state)
+        updated_states = self.mode_matched_update(z,immstate,sensor_state=sensor_state)
 
         updated_immstate = MixtureParameters(updated_weights, updated_states)
         return updated_immstate
@@ -285,42 +285,62 @@ class IMM(Generic[MT]):
         self, immstate_mixture: MixtureParameters[MixtureParameters[MT]]
     ) -> MixtureParameters[MT]:
         """Approximate a mixture of immstates as a single immstate"""
-          
-        gauss_params = []
+        """
+        This function accepts as parameter 7.54 from the compendium. 
+        immstate_mixture is a mixture of gaussian mixtures.
+        """
+
+        gaussParams_per_mode = []
+        weights_per_mode = []
+
+        #immstate_mixture.components is f(yk|ak, Z1:k) equations 7.47 and 7.49
+        for mixture_of_modes in immstate_mixture.components:
+            mode_list = mixture_of_modes.components
+            weights_per_mode.append(mixture_of_modes.weights)
+            gaussParams_per_mode.append(mode_list)
+            
+            
+        reduced_mixtures = []   
+        gaussParams_per_mode = np.array(gaussParams_per_mode)
+        weights_per_mode = np.array(weights_per_mode)
+
+        for column in range(len(gaussParams_per_mode[0])):
+            components_per_mode = gaussParams_per_mode[:, column]
+            x = np.array([c.mean for c in components_per_mode], dtype=float)
+            P = np.array([c.cov for c in components_per_mode], dtype=float)
+            weights = immstate_mixture.weights
+            reduced_per_mode = gaussian_mixture_moments(weights, x, P)
+            reduced_mixtures.append(GaussParams(reduced_per_mode[0], reduced_per_mode[1]))
+            
+            
+            
+        
+        
+        w = np.sum(weights_per_mode, axis=0)
+        w = w/np.sum(w)
+        return MixtureParameters(w, reduced_mixtures)
         
         for mixture in immstate_mixture.components: #Fetch immstate_mixture.components[j]
-            w = mixture.weights
+            
+        
+            
+        
+            
+            # mixture is output of 7.51 and 7.52        
+            w = mixture.weights #Pr{sk|ak, Z1:k}
+            
+            # Below, components of p(xk|sk, ak, Z1:k)
             x = np.array([c.mean for c in mixture.components], dtype=float)
             P = np.array([c.cov for c in mixture.components], dtype=float)
             x_reduced, P_reduced = gaussian_mixture_moments(w, x, P)
-            gauss_params.append(GaussParams(x_reduced, P_reduced))
+            reduced_mixture_per_mode.append(GaussParams(x_reduced, P_reduced))
         
-        w = immstate_mixture.weights
-        x = np.array([c.mean for c in gauss_params], dtype=float)
-        P = np.array([c.cov for c in gauss_params], dtype=float)
-        x_reduced, P_reduced = gaussian_mixture_moments(w, x, P)
-        return GaussParams(x_reduced, P_reduced)
-            
-        # # extract probabilities as array
-        # weights = immstate_mixture.weights
-        # component_conditioned_mode_prob = np.array(
-        #     [c.weights.ravel() for c in immstate_mixture.components]
-        # )
+        
+        w = immstate_mixture.weights #Pr{ak|Z1:k}
+        return MixtureParameters(immstate_mixture.weights, reduced_mixture_per_mode)
+        
+    
 
-        # # flip conditioning order with Bayes
-        # mode_prob, mode_conditioned_component_prob = \
-        #     discretebayes.discrete_bayes(weights,
-        #                                  component_conditioned_mode_prob)
-        
-        # mode_states = immstate_mixture.components            
-        
-        
-        # # Hint list_a of lists_b to list_b of lists_a: zip(*immstate_mixture.components)
-        # mode_states = None # TODO
-
-        # immstate_reduced = MixtureParameters(mode_prob, mode_states)
-
-        #return immstate_reduced
 
     def estimate(self, immstate: MixtureParameters[MT]
     ) -> GaussParams:
@@ -328,21 +348,13 @@ class IMM(Generic[MT]):
 
         # ! You can assume all the modes have the same reduce and estimate function
         # ! and use eg. self.filters[0] functionality
-        #data_reduced = None  # what should this variable represent?
-
-        # make all components' mean and cov into their own separate lists
-        means = []
-        covs = []
-        for comp in immstate.components:
-            means.append(comp.mean)
-            covs.append(comp.cov)
-        means = np.array(means)
-        covs = np.array(covs)
-
-        mean_reduced, cov_reduced = gaussian_mixture_moments(
-            immstate.weights, means, covs)
-        estimate = GaussParams(mean_reduced, cov_reduced)
-        return estimate
+        
+      
+        x = np.array([c.mean for c in immstate.components], dtype=float)
+        P = np.array([c.cov for c in immstate.components], dtype=float)
+        x_reduced, P_reduced = gaussian_mixture_moments(immstate.weights, x, P)
+        
+        return GaussParams(x_reduced, P_reduced)
 
     def gate(
         self,

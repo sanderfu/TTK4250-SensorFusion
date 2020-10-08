@@ -123,14 +123,14 @@ if play_movie:
 # but no exceptions do not guarantee correct implementation.
 
 # sensor
-sigma_z = 10
+sigma_z = 2
 clutter_intensity = 1e-2
 PD = 0.8
 gate_size = 5
 
 # dynamic models
-sigma_a_CV = 0.5
-sigma_a_CT = 0.5
+sigma_a_CV = 3.5
+sigma_a_CT = 4.5
 sigma_omega = 0.3
 
 

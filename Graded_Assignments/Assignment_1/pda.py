@@ -103,7 +103,7 @@ class PDA(Generic[ET]):  # Probabilistic Data Association
         
         conditional_update_not_misdetection = []
         for z_row in Z:
-            conditional_update_not_misdetection.append(self.state_filter.update(z_row,filter_state,sensor_state))
+            conditional_update_not_misdetection.append(self.state_filter.update(z_row,filter_state,sensor_state=sensor_state))
             
         conditional_update.extend(
             conditional_update_not_misdetection
