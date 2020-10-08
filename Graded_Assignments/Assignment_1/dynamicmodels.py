@@ -185,7 +185,7 @@ def diff_sinc(x: np.ndarray) -> np.ndarray:  # same shape as input
     xpi = np.pi * x
     dsinc = np.where(
         np.abs(x) > 1e-3,
-        (np.cos(xpi) - np.sinc(x)) / x,
+        (np.cos(xpi) - np.sinc(x)), #/ x,
         (-xpi / 3 + xpi ** 3 / 30) * np.pi,
     )
     return dsinc

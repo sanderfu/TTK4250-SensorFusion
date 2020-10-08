@@ -285,24 +285,42 @@ class IMM(Generic[MT]):
         self, immstate_mixture: MixtureParameters[MixtureParameters[MT]]
     ) -> MixtureParameters[MT]:
         """Approximate a mixture of immstates as a single immstate"""
+          
+        gauss_params = []
+        
+        for mixture in immstate_mixture.components: #Fetch immstate_mixture.components[j]
+            w = mixture.weights
+            x = np.array([c.mean for c in mixture.components], dtype=float)
+            P = np.array([c.cov for c in mixture.components], dtype=float)
+            x_reduced, P_reduced = gaussian_mixture_moments(w, x, P)
+            gauss_params.append(GaussParams(x_reduced, P_reduced))
+        
+        w = immstate_mixture.weights
+        x = np.array([c.mean for c in gauss_params], dtype=float)
+        P = np.array([c.cov for c in gauss_params], dtype=float)
+        x_reduced, P_reduced = gaussian_mixture_moments(w, x, P)
+        return GaussParams(x_reduced, P_reduced)
+            
+        # # extract probabilities as array
+        # weights = immstate_mixture.weights
+        # component_conditioned_mode_prob = np.array(
+        #     [c.weights.ravel() for c in immstate_mixture.components]
+        # )
 
-        # extract probabilities as array
-        weights = immstate_mixture.weights
-        component_conditioned_mode_prob = np.array(
-            [c.weights.ravel() for c in immstate_mixture.components]
-        )
+        # # flip conditioning order with Bayes
+        # mode_prob, mode_conditioned_component_prob = \
+        #     discretebayes.discrete_bayes(weights,
+        #                                  component_conditioned_mode_prob)
+        
+        # mode_states = immstate_mixture.components            
+        
+        
+        # # Hint list_a of lists_b to list_b of lists_a: zip(*immstate_mixture.components)
+        # mode_states = None # TODO
 
-        # flip conditioning order with Bayes
-        mode_prob, mode_conditioned_component_prob = \
-            discretebayes.discrete_bayes(weights,
-                                         component_conditioned_mode_prob)
+        # immstate_reduced = MixtureParameters(mode_prob, mode_states)
 
-        # Hint list_a of lists_b to list_b of lists_a: zip(*immstate_mixture.components)
-        mode_states = None # TODO
-
-        immstate_reduced = MixtureParameters(mode_prob, mode_states)
-
-        return immstate_reduced
+        #return immstate_reduced
 
     def estimate(self, immstate: MixtureParameters[MT]
     ) -> GaussParams:
