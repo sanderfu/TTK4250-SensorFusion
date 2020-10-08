@@ -123,14 +123,14 @@ if play_movie:
 # but no exceptions do not guarantee correct implementation.
 
 # sensor
-sigma_z = 2
-clutter_intensity = 1e-2
-PD = 0.8
-gate_size = 5
+sigma_z = 10
+clutter_intensity = 1e-3
+PD = 0.95
+gate_size = 3
 
 # dynamic models
-sigma_a_CV = 3.5
-sigma_a_CT = 4.5
+sigma_a_CV = 15
+sigma_a_CT = 15
 sigma_omega = 0.3
 
 
@@ -144,7 +144,7 @@ PI = np.array([[PI11, (1 - PI11)], [(1 - PI22), PI22]])
 assert np.allclose(np.sum(PI, axis=1), 1), "rows of PI must sum to 1"
 
 mean_init = np.array([0, 0, 0, 0, 0])
-cov_init = np.diag([1000, 1000, 30, 30, 0.1]) ** 2  # THIS WILL NOT BE GOOD
+cov_init = np.diag([20, 20, 5, 5, 0.5]) ** 2  # THIS WILL NOT BE GOOD
 mode_probabilities_init = np.array([p10, (1 - p10)])
 mode_states_init = GaussParams(mean_init, cov_init)
 init_imm_state = MixtureParameters(mode_probabilities_init, [mode_states_init] * 2)

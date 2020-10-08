@@ -39,6 +39,7 @@ class PDA(Generic[ET]):  # Probabilistic Data Association
         # The loop can be done using ether of these: normal loop, list comprehension or map
         gated = []  # TODO: some for loop over elements of Z using self.state_filter.gate
         for z_row in Z:
+            the_z_row = z_row;
             gated.append(self.state_filter.gate(z_row,filter_state,sensor_state=sensor_state,gate_size_square=g_squared))
             
         gated = np.array(gated)

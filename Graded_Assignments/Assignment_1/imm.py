@@ -319,27 +319,6 @@ class IMM(Generic[MT]):
         w = np.sum(weights_per_mode, axis=0)
         w = w/np.sum(w)
         return MixtureParameters(w, reduced_mixtures)
-        
-        for mixture in immstate_mixture.components: #Fetch immstate_mixture.components[j]
-            
-        
-            
-        
-            
-            # mixture is output of 7.51 and 7.52        
-            w = mixture.weights #Pr{sk|ak, Z1:k}
-            
-            # Below, components of p(xk|sk, ak, Z1:k)
-            x = np.array([c.mean for c in mixture.components], dtype=float)
-            P = np.array([c.cov for c in mixture.components], dtype=float)
-            x_reduced, P_reduced = gaussian_mixture_moments(w, x, P)
-            reduced_mixture_per_mode.append(GaussParams(x_reduced, P_reduced))
-        
-        
-        w = immstate_mixture.weights #Pr{ak|Z1:k}
-        return MixtureParameters(immstate_mixture.weights, reduced_mixture_per_mode)
-        
-    
 
 
     def estimate(self, immstate: MixtureParameters[MT]
@@ -366,11 +345,13 @@ class IMM(Generic[MT]):
         """Check if z is within the gate of any mode in immstate in sensor_state"""
         
         gated_per_mode = []
+        inside_gate=False
         for NIS in self.NISes(z,immstate,sensor_state=sensor_state):
-            gated_per_mode.append(NIS<gate_size_square)
-
-        gated = np.any(gated_per_mode)
-        return gated
+            the_NIS = NIS
+            inside_gate = NIS<gate_size_square
+            if np.any(inside_gate):
+                return True
+        return False
 
     def NISes(
         self,
