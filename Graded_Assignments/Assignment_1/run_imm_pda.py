@@ -234,6 +234,9 @@ axs3[0].set_title(
     f"RMSE(pos, vel) = ({posRMSE:.3f}, {velRMSE:.3f})\npeak_dev(pos, vel) = ({peak_pos_deviation:.3f}, {peak_vel_deviation:.3f})"
 )
 axs3[0].axis("equal")
+for i in range(0,len(x_hat.T[:2][0]), 10):
+    axs3[0].text(x_hat.T[0][i], x_hat.T[1][i], f"t: {i*Ts}",  style='oblique',
+        bbox={'facecolor': 'white', 'alpha': 0.5, 'pad': 5})
 # probabilities
 axs3[1].plot(np.arange(K) * Ts, prob_hat)
 axs3[1].set_ylim([0, 1])
