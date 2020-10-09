@@ -4,6 +4,7 @@ from typing import List
 import scipy
 import scipy.io
 import scipy.stats
+import ipdb
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -75,6 +76,7 @@ filename_to_load = "data_for_imm_pda.mat"
 loaded_data = scipy.io.loadmat(filename_to_load)
 K = loaded_data["K"].item()
 Ts = loaded_data["Ts"].item()
+ipdb.set_trace()
 Xgt = loaded_data["Xgt"].T
 Z = [zk.T for zk in loaded_data["Z"].ravel()]
 true_association = loaded_data["a"].ravel()
@@ -183,6 +185,7 @@ tracker_predict_list = []
 tracker_estimate_list = []
 # estimate
 for k, (Zk, x_true_k) in enumerate(zip(Z, Xgt)):
+    ipdb.set_trace()
     tracker_predict = tracker.predict(tracker_update, Ts)
     tracker_update = tracker.update(Zk, tracker_predict)
 
