@@ -188,7 +188,7 @@ class IMM(Generic[MT]):
         for ekf_filter,mode_state in zip(self.filters,immstate.components):    
             updated_state.append(ekf_filter.update(z,mode_state,sensor_state))
 
-        updated_state = np.array(updated_state)
+        #updated_state = np.array(updated_state)
         #Return vector (M,...) with means and covariance for every mode 
         #MT = GaussParams
         return updated_state
