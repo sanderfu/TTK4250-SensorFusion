@@ -1,0 +1,6 @@
+numpy
+singledispatchmethod
+dataclasses
+scipy
+matplotlib
+typing_extensions
