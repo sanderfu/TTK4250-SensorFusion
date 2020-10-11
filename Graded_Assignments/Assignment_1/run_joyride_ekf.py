@@ -310,7 +310,7 @@ axs5[1].set_ylabel("velocity error")
 # probabilities
 
 # NEES
-fig7, axs7 = plt.subplots(3, sharex=True, num=4, clear=True)
+fig7, axs7 = plt.subplots(3, sharex=True, num=7, clear=True)
 axs7[0].plot(time, NEESpos_CT)
 axs7[0].plot([0, time[-1]], np.repeat(CI2[None], 2, 0), "--r")
 axs7[0].set_ylabel("NEES pos_CT")
@@ -334,7 +334,7 @@ print(f"ANEESvel_CT = {ANEESvel_CT:.2f} with CI = [{CI2K[0]:.2f}, {CI2K[1]:.2f}]
 print(f"ANEES_CT = {ANEES_CT:.2f} with CI = [{CI4K[0]:.2f}, {CI4K[1]:.2f}]")
 
 # errors
-fig8, axs8 = plt.subplots(2, num=5, clear=True)
+fig8, axs8 = plt.subplots(2, num=8, clear=True)
 axs8[0].plot(time, np.linalg.norm(x_hat_CT[:, :2] - Xgt[:, :2], axis=1))
 axs8[0].set_ylabel("position error")
 
