@@ -4,20 +4,20 @@ from typing import List
 import scipy
 import scipy.io
 import scipy.stats
-import ipdb
 
+import ipdb
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
 from gaussparams import GaussParams
 from mixturedata import MixtureParameters
+import estimationstatistics as estats
 import dynamicmodels
 import measurementmodels
 import ekf
 import imm
 import pda
-import estimationstatistics as estats
 
 # %% plot config check and style setup
 
@@ -72,13 +72,16 @@ except Exception as e:
 
 
 # %% load data and plot
-filename_to_load = "data_for_imm_pda.mat"
+filename_to_load = "data_joyride.mat"
 loaded_data = scipy.io.loadmat(filename_to_load)
 K = loaded_data["K"].item()
-Ts = loaded_data["Ts"].item()
+Ts = loaded_data["Ts"].squeeze()
 Xgt = loaded_data["Xgt"].T
 Z = [zk.T for zk in loaded_data["Z"].ravel()]
-true_association = loaded_data["a"].ravel()
+time = loaded_data["time"].squeeze()
+time=time-time[0]
+
+# plot measurements close to the trajectory
 
 # plot measurements close to the trajectory
 fig1, ax1 = plt.subplots(num=1, clear=True)
@@ -89,7 +92,7 @@ for Zk, xgtk in zip(Z, Xgt):
     to_plot = np.linalg.norm(Zk - xgtk[None:2], axis=1) <= plot_measurement_distance
     Z_plot_data = np.append(Z_plot_data, Zk[to_plot], axis=0)
 
-ax1.scatter(*Z_plot_data.T, s=5, color="C1")
+ax1.scatter(*Z_plot_data.T, color="C1")
 ax1.plot(*Xgt.T[:2], color="C0", linewidth=1.5)
 ax1.set_title("True trajectory and the nearby measurements")
 plt.show(block=False)
@@ -101,7 +104,7 @@ if play_movie:
     if "inline" in matplotlib.get_backend():
         print("the movie might not play with inline plots")
     fig2, ax2 = plt.subplots(num=2, clear=True)
-    sh = ax2.scatter(np.nan, np.nan, s=5)
+    sh = ax2.scatter(np.nan, np.nan)
     th = ax2.set_title(f"measurements at step 0")
     mins = np.vstack(Z).min(axis=0)
     maxes = np.vstack(Z).max(axis=0)
@@ -115,45 +118,38 @@ if play_movie:
         plt.show(block=False)
         plt.pause(plotpause)
 
-
-# %% IMM-PDA
-
-# THE PRESET PARAMETERS AND INITIAL VALUES WILL CAUSE TRACK LOSS!
-# Some reasoning and previous exercises should let you avoid track loss.
-# No exceptions should be generated if PDA works correctly with IMM,
-# but no exceptions do not guarantee correct implementation.
+# %% setup and track
 
 # sensor
-sigma_z = 1.7
-clutter_intensity = 1e-3
-PD = 0.90
-gate_size = 5
+sigma_z = 6
+clutter_intensity = 1e-5
+PD = 0.75
+gate_size = 4
 
 # dynamic models
-sigma_a_CV = 0.19
-sigma_a_CT = 0.09
+sigma_a_CV = 1
+sigma_a_CT = 7
 sigma_omega = 0.05 * np.pi
 
 
 # markov chain
-PI11 = 0.9
-PI22 = 0.9
+PI11 = 0.95
+PI22 = 0.75
 
 p10 = 0.9  # initvalue for mode probabilities
 
 PI = np.array([[PI11, (1 - PI11)], [(1 - PI22), PI22]])
 assert np.allclose(np.sum(PI, axis=1), 1), "rows of PI must sum to 1"
 
-mean_init = np.array([0,0, 0, 0, 0])
+mean_init = np.array([7096,3627, 0, 0, 0])
 cov_init = np.zeros((5, 5))
 cov_init[[0, 1], [0, 1]] = 2 * sigma_z ** 2
 cov_init[[2, 3], [2, 3]] = 10 ** 2
-cov_init[4,4] = 0.1
+cov_init[4,4] = 10
 
 mode_probabilities_init = np.array([p10, (1 - p10)])
 mode_states_init = GaussParams(mean_init, cov_init)
 init_imm_state = MixtureParameters(mode_probabilities_init, [mode_states_init] * 2)
-
 
 assert np.allclose(
     np.sum(mode_probabilities_init), 1
@@ -183,8 +179,12 @@ tracker_update_list = []
 tracker_predict_list = []
 tracker_estimate_list = []
 # estimate
+Ts = np.append([2.5],Ts)
+
 for k, (Zk, x_true_k) in enumerate(zip(Z, Xgt)):
-    tracker_predict = tracker.predict(tracker_update, Ts)
+    
+    current_Ts = Ts[k]
+    tracker_predict = tracker.predict(tracker_update, current_Ts)
     tracker_update = tracker.update(Zk, tracker_predict)
 
     # You can look at the prediction estimate as well
@@ -213,9 +213,6 @@ velRMSE = np.sqrt(np.mean(velerr ** 2))
 peak_pos_deviation = poserr.max()
 peak_vel_deviation = velerr.max()
 
-print("posRMSE: ",posRMSE)
-print("velRMSE: ",velRMSE)
-print()
 
 # consistency
 confprob = 0.9
@@ -229,19 +226,8 @@ ANEESpos = np.mean(NEESpos)
 ANEESvel = np.mean(NEESvel)
 ANEES = np.mean(NEES)
 
-NEESpos_in_interval = ((CI2[0]<=NEESpos) & (CI2[1]>=NEESpos)).sum()
-NEESvel_in_interval = ((CI2[0]<=NEESvel) & (CI2[1]>=NEESvel)).sum()
-NEES_in_interval = ((CI4[0]<=NEES) & (CI4[1]>=NEES)).sum()
-
-print("NEESpos in interval: ",NEESpos_in_interval)
-print("NEESvel in interval: ",NEESvel_in_interval)
-print("NEES in interval: ",NEES_in_interval)
-
 # %% plots
 # trajectory
-
-text_size = 60
-
 fig3, axs3 = plt.subplots(1, 2, num=3, clear=True)
 axs3[0].plot(*x_hat.T[:2], label=r"$\hat x$")
 axs3[0].plot(*Xgt.T[:2], label="$x$")
@@ -249,42 +235,44 @@ axs3[0].set_title(
     f"RMSE(pos, vel) = ({posRMSE:.3f}, {velRMSE:.3f})\npeak_dev(pos, vel) = ({peak_pos_deviation:.3f}, {peak_vel_deviation:.3f})"
 )
 axs3[0].axis("equal")
+bbox_CV={'facecolor': 'blue', 'alpha': 0.5, 'pad': 5}
+bbox_CT={'facecolor': 'green', 'alpha': 0.5, 'pad': 5}
+bbox_chosen = {'facecolor': 'white', 'alpha': 0.5, 'pad': 5}
 for i in range(0,len(x_hat.T[:2][0]), 10):
-    axs3[0].text(x_hat.T[0][i], x_hat.T[1][i], f"t: {i*Ts}",  style='oblique',
-        bbox={'facecolor': 'white', 'alpha': 0.5, 'pad': 5})
+    #if prob_hat[i,0]>prob_hat[i,1]:
+    #    bbox_chosen=bbox_CV
+    #else:
+    #    bbxo_chosen = bbox_CT
+    axs3[0].text(x_hat.T[0][i], x_hat.T[1][i], f"t: {round(time[i],1)}",  style='oblique',
+        bbox=bbox_chosen)
 # probabilities
-axs3[1].plot(np.arange(K) * Ts, prob_hat)
+axs3[1].plot(time, prob_hat[:,0], label="CV")
+axs3[1].plot(time, prob_hat[:,1], label="CT")
 axs3[1].set_ylim([0, 1])
 axs3[1].set_ylabel("mode probability")
 axs3[1].set_xlabel("time")
-
-fig9, axs9 = plt.subplots(1, 1, num=9, clear=True)
-axs9.plot(np.arange(K) * Ts,prob_hat[:,0], label="CV")
-axs9.plot(np.arange(K) * Ts,prob_hat[:,1], label="CT")
-axs9.set_ylim([0, 1])
-axs9.set_ylabel("Mode probability",fontsize=text_size)
-axs9.set_xlabel("time [s]",fontsize=text_size)
-axs9.legend(loc=1, prop={'size': text_size})
+axs3[1].legend()
+plt.show()
 
 # NEES
 fig4, axs4 = plt.subplots(3, sharex=True, num=4, clear=True)
-axs4[0].plot(np.arange(K) * Ts, NEESpos)
-axs4[0].plot([0, (K - 1) * Ts], np.repeat(CI2[None], 2, 0), "--r")
-axs4[0].set_ylabel("NEES pos",fontsize=text_size)
+axs4[0].plot(time, NEESpos)
+axs4[0].plot([0, time[-1]], np.repeat(CI2[None], 2, 0), "--r")
+axs4[0].set_ylabel("NEES pos")
 inCIpos = np.mean((CI2[0] <= NEESpos) * (NEESpos <= CI2[1]))
-axs4[0].set_title(f"{inCIpos*100:.1f}% inside {confprob*100:.1f}% CI",fontsize=text_size)
+axs4[0].set_title(f"{inCIpos*100:.1f}% inside {confprob*100:.1f}% CI")
 
-axs4[1].plot(np.arange(K) * Ts, NEESvel)
-axs4[1].plot([0, (K - 1) * Ts], np.repeat(CI2[None], 2, 0), "--r")
-axs4[1].set_ylabel("NEES vel",fontsize=text_size)
+axs4[1].plot(time, NEESvel)
+axs4[1].plot([0, time[-1]], np.repeat(CI2[None], 2, 0), "--r")
+axs4[1].set_ylabel("NEES vel")
 inCIvel = np.mean((CI2[0] <= NEESvel) * (NEESvel <= CI2[1]))
-axs4[1].set_title(f"{inCIvel*100:.1f}% inside {confprob*100:.1f}% CI",fontsize=text_size)
+axs4[1].set_title(f"{inCIvel*100:.1f}% inside {confprob*100:.1f}% CI")
 
-axs4[2].plot(np.arange(K) * Ts, NEES)
-axs4[2].plot([0, (K - 1) * Ts], np.repeat(CI4[None], 2, 0), "--r")
-axs4[2].set_ylabel("NEES",fontsize=text_size)
+axs4[2].plot(time, NEES)
+axs4[2].plot([0, time[-1]], np.repeat(CI4[None], 2, 0), "--r")
+axs4[2].set_ylabel("NEES")
 inCI = np.mean((CI2[0] <= NEES) * (NEES <= CI2[1]))
-axs4[2].set_title(f"{inCI*100:.1f}% inside {confprob*100:.1f}% CI",fontsize=text_size)
+axs4[2].set_title(f"{inCI*100:.1f}% inside {confprob*100:.1f}% CI")
 
 print(f"ANEESpos = {ANEESpos:.2f} with CI = [{CI2K[0]:.2f}, {CI2K[1]:.2f}]")
 print(f"ANEESvel = {ANEESvel:.2f} with CI = [{CI2K[0]:.2f}, {CI2K[1]:.2f}]")
@@ -292,15 +280,11 @@ print(f"ANEES = {ANEES:.2f} with CI = [{CI4K[0]:.2f}, {CI4K[1]:.2f}]")
 
 # errors
 fig5, axs5 = plt.subplots(2, num=5, clear=True)
-# = fig5.suptitle("Estimation error (Euclidean Distance)", fontsize=50)
-axs5[0].plot(np.arange(K) * Ts, np.linalg.norm(x_hat[:, :2] - Xgt[:, :2], axis=1))
-axs5[0].set_ylabel("position error [m]",fontsize=text_size)
-axs5[0].set_xlabel("time [s]",fontsize=text_size)
+axs5[0].plot(time, np.linalg.norm(x_hat[:, :2] - Xgt[:, :2], axis=1))
+axs5[0].set_ylabel("position error")
 
-axs5[1].plot(np.arange(K) * Ts, np.linalg.norm(x_hat[:, 2:4] - Xgt[:, 2:4], axis=1))
-axs5[1].set_ylabel("velocity error [m/s]",fontsize=text_size)
-axs5[1].set_xlabel("time [s]",fontsize=text_size)
-
+axs5[1].plot(time, np.linalg.norm(x_hat[:, 2:4] - Xgt[:, 2:4], axis=1))
+axs5[1].set_ylabel("velocity error")
 
 plt.show()
 
@@ -334,7 +318,9 @@ plt.show()
 #     return ax.add_patch(ell)
 
 
-# play_estimation_movie = True
+# play_estimation_movie = False
+# if not play_estimation_movie:
+#     plt.pause(999999999999)
 # mTL = 0.2  # maximum transparancy (between 0 and 1);
 # plot_pause = 1  # lenght to pause between time steps;
 # start_k = 1
@@ -350,12 +336,11 @@ plt.show()
 # max_ax = np.vstack(Z).max(axis=0)  # max(cell2mat(Z'));
 # axs6[0].axis([min_ax[0], max_ax[0], min_ax[1], max_ax[0]])
 
-# for k, (Zk, pred_k, upd_k, ak) in enumerate(
+# for k, (Zk, pred_k, upd_k) in enumerate(
 #     zip(
 #         Z[plot_range],
 #         tracker_predict_list[plot_range],
 #         tracker_update_list[plot_range],
-#         true_association[plot_range],
 #     ),
 #     start_k,
 # ):
@@ -421,10 +406,10 @@ plt.show()
 #         )
 #         meas_sc.set_offsets(Zk)
 #         #pl.append(axs6[0].scatter(*Zk.T, color="r", marker="x"))
-#         if ak > 0:
-#             meas_sc_true.set_offsets(Zk[ak - 1])
-#         else:
-#             meas_sc_true.set_offsets(np.array([np.nan, np.nan]))
+#         # if ak > 0:
+#         #     meas_sc_true.set_offsets(Zk[ak - 1])
+#         # else:
+#         #     meas_sc_true.set_offsets(np.array([np.nan, np.nan]))
 
 #         # for j = 1:size(xkupd, 3)
 #         #     csj = mTL * co(s, :) + (1 - mTL) * (beta(j)*skupd(s, j)*co(s, :) + (1 - beta(j)*skupd(s, j)) * ones(1, 3)); % transparancy
@@ -448,3 +433,4 @@ plt.show()
 #     plt.pause(plot_pause)
 
 # %%
+

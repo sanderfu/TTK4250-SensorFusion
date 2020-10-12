@@ -121,24 +121,30 @@ if play_movie:
 # %% setup and track
 
 # sensor
-sigma_z = 25
+sigma_z = 6
 clutter_intensity = 1e-5
-PD = 0.90
-gate_size = 5
+PD = 0.75
+gate_size = 3
 
 # dynamic models
-sigma_a_CV = 0.5
+sigma_a_CV = 2
 sigma_a_CT = 3
-sigma_omega = 0.0005 * np.pi
+sigma_omega = 0.05 * np.pi
+
+sigma_a_CT_high = 4
+sigma_omega_high = sigma_omega*2
 
 
 # markov chain
-PI11 = 0.85
-PI22 = 0.85
+PI11 = 0.95
+PI22 = 0.95
+PI33 = 0.95
 
-p10 = 0.9  # initvalue for mode probabilities
+p10 = 0.4  # initvalue for mode 1
+p20 = 0.4  # initvalue for mode 2
+p30 = 0.2  # initvalue for mode 3
 
-PI = np.array([[PI11, (1 - PI11)], [(1 - PI22), PI22]])
+PI = np.array([[PI11, (0.5 - PI11/2), (0.5 - PI11/2)], [(0.5 - PI22/2), PI22, (0.5-PI22/2)], [(0.5 - PI33/2),(0.5 - PI33/2),PI33]])
 assert np.allclose(np.sum(PI, axis=1), 1), "rows of PI must sum to 1"
 
 mean_init = np.array([7096,3627, 0, 0, 0])
@@ -147,9 +153,9 @@ cov_init[[0, 1], [0, 1]] = 2 * sigma_z ** 2
 cov_init[[2, 3], [2, 3]] = 10 ** 2
 cov_init[4,4] = 0.1
 
-mode_probabilities_init = np.array([p10, (1 - p10)])
+mode_probabilities_init = np.array([p10, p20, p30])
 mode_states_init = GaussParams(mean_init, cov_init)
-init_imm_state = MixtureParameters(mode_probabilities_init, [mode_states_init] * 2)
+init_imm_state = MixtureParameters(mode_probabilities_init, [mode_states_init] * 3)
 
 assert np.allclose(
     np.sum(mode_probabilities_init), 1
@@ -160,9 +166,11 @@ measurement_model = measurementmodels.CartesianPosition(sigma_z, state_dim=5)
 dynamic_models: List[dynamicmodels.DynamicModel] = []
 dynamic_models.append(dynamicmodels.WhitenoiseAccelleration(sigma_a_CV, n=5))
 dynamic_models.append(dynamicmodels.ConstantTurnrate(sigma_a_CT, sigma_omega))
+dynamic_models.append(dynamicmodels.ConstantTurnrate(sigma_a_CT_high, sigma_omega_high))
 ekf_filters = []
 ekf_filters.append(ekf.EKF(dynamic_models[0], measurement_model))
 ekf_filters.append(ekf.EKF(dynamic_models[1], measurement_model))
+ekf_filters.append(ekf.EKF(dynamic_models[2], measurement_model))
 imm_filter = imm.IMM(ekf_filters, PI)
 
 tracker = pda.PDA(imm_filter, clutter_intensity, PD, gate_size)
@@ -248,6 +256,7 @@ for i in range(0,len(x_hat.T[:2][0]), 10):
 # probabilities
 axs3[1].plot(time, prob_hat[:,0], label="CV")
 axs3[1].plot(time, prob_hat[:,1], label="CT")
+axs3[1].plot(time, prob_hat[:,2], label="CT HIGH")
 axs3[1].set_ylim([0, 1])
 axs3[1].set_ylabel("mode probability")
 axs3[1].set_xlabel("time")
@@ -289,148 +298,149 @@ axs5[1].set_ylabel("velocity error")
 plt.show()
 
 # %% TBD: estimation "movie"
-def plot_cov_ellipse2d(
-    ax: plt.Axes,
-    mean: np.ndarray = np.zeros(2),
-    cov: np.ndarray = np.eye(2),
-    n_sigma: float = 1,
-    *,
-    edgecolor: "Color" = "C0",
-    facecolor: "Color" = "none",
-    **kwargs,  # extra Ellipse keyword arguments
-) -> matplotlib.patches.Ellipse:
-    """Plot a n_sigma covariance ellipse centered in mean into ax."""
-    ell_trans_mat = np.zeros((3, 3))
-    ell_trans_mat[:2, :2] = np.linalg.cholesky(cov)
-    ell_trans_mat[:2, 2] = mean
-    ell_trans_mat[2, 2] = 1
 
-    ell = matplotlib.patches.Ellipse(
-        (0.0, 0.0),
-        2.0 * n_sigma,
-        2.0 * n_sigma,
-        edgecolor=edgecolor,
-        facecolor=facecolor,
-        **kwargs,
-    )
-    trans = matplotlib.transforms.Affine2D(ell_trans_mat)
-    ell.set_transform(trans + ax.transData)
-    return ax.add_patch(ell)
+# def plot_cov_ellipse2d(
+#     ax: plt.Axes,
+#     mean: np.ndarray = np.zeros(2),
+#     cov: np.ndarray = np.eye(2),
+#     n_sigma: float = 1,
+#     *,
+#     edgecolor: "Color" = "C0",
+#     facecolor: "Color" = "none",
+#     **kwargs,  # extra Ellipse keyword arguments
+# ) -> matplotlib.patches.Ellipse:
+#     """Plot a n_sigma covariance ellipse centered in mean into ax."""
+#     ell_trans_mat = np.zeros((3, 3))
+#     ell_trans_mat[:2, :2] = np.linalg.cholesky(cov)
+#     ell_trans_mat[:2, 2] = mean
+#     ell_trans_mat[2, 2] = 1
+
+#     ell = matplotlib.patches.Ellipse(
+#         (0.0, 0.0),
+#         2.0 * n_sigma,
+#         2.0 * n_sigma,
+#         edgecolor=edgecolor,
+#         facecolor=facecolor,
+#         **kwargs,
+#     )
+#     trans = matplotlib.transforms.Affine2D(ell_trans_mat)
+#     ell.set_transform(trans + ax.transData)
+#     return ax.add_patch(ell)
 
 
-play_estimation_movie = False
-if not play_estimation_movie:
-    plt.pause(999999999999)
-mTL = 0.2  # maximum transparancy (between 0 and 1);
-plot_pause = 1  # lenght to pause between time steps;
-start_k = 1
-end_k = 100
-plot_range = slice(start_k, end_k)  # the range to go through
+# play_estimation_movie = False
+# if not play_estimation_movie:
+#     plt.pause(999999999999)
+# mTL = 0.2  # maximum transparancy (between 0 and 1);
+# plot_pause = 1  # lenght to pause between time steps;
+# start_k = 1
+# end_k = 100
+# plot_range = slice(start_k, end_k)  # the range to go through
 
-# %k = 31; assert(all([k > 1, k <= K]), 'K must be in proper range')
-fig6, axs6 = plt.subplots(1, 2, num=6, clear=True)
-mode_lines = [axs6[0].plot(np.nan, np.nan, color=f"C{s}")[0] for s in range(2)]
-meas_sc = axs6[0].scatter(np.nan, np.nan, color="r", marker="x")
-meas_sc_true = axs6[0].scatter(np.nan, np.nan, color="g", marker="x")
-min_ax = np.vstack(Z).min(axis=0)  # min(cell2mat(Z'));
-max_ax = np.vstack(Z).max(axis=0)  # max(cell2mat(Z'));
-axs6[0].axis([min_ax[0], max_ax[0], min_ax[1], max_ax[0]])
+# # %k = 31; assert(all([k > 1, k <= K]), 'K must be in proper range')
+# fig6, axs6 = plt.subplots(1, 2, num=6, clear=True)
+# mode_lines = [axs6[0].plot(np.nan, np.nan, color=f"C{s}")[0] for s in range(2)]
+# meas_sc = axs6[0].scatter(np.nan, np.nan, color="r", marker="x")
+# meas_sc_true = axs6[0].scatter(np.nan, np.nan, color="g", marker="x")
+# min_ax = np.vstack(Z).min(axis=0)  # min(cell2mat(Z'));
+# max_ax = np.vstack(Z).max(axis=0)  # max(cell2mat(Z'));
+# axs6[0].axis([min_ax[0], max_ax[0], min_ax[1], max_ax[0]])
 
-for k, (Zk, pred_k, upd_k) in enumerate(
-    zip(
-        Z[plot_range],
-        tracker_predict_list[plot_range],
-        tracker_update_list[plot_range],
-    ),
-    start_k,
-):
-    # k, (Zk, pred_k, upd_k, ak) = data
-    (ax.cla() for ax in axs6)
-    pl = []
-    gated = tracker.gate(Zk, pred_k)  # probbar(:, k), xbar(:, :, k), Pbar(:, :, :, k));
-    minG = 1e20 * np.ones(2)
-    maxG = np.zeros(2)
-    cond_upd_k = tracker.conditional_update(Zk[gated], pred_k)
-    beta_k = tracker.association_probabilities(Zk[gated], pred_k)
-    for s in range(2):
-        mode_lines[s].set_data = (
-            np.array([u.components[s].mean[:2] for u in tracker_update_list[:k]]).T,
-        )
-        axs6[1].plot(prob_hat[: (k - 1), s], color=f"C{s}")
-        for j, cuj in enumerate(cond_upd_k):
-            alpha = 0.7 * beta_k[j] * cuj.weights[s] + 0.3
-            # csj = mTL * co(s, :) + (1 - mTL) * (beta(j)*skupd(s, j)*co(s, :) + (1 - beta(j)*skupd(s, j)) * ones(1, 3)); % transparancy
-            upd_km1_s = tracker_update_list[k - 1].components[s]
-            pl.append(
-                axs6[0].plot(
-                    [upd_km1_s.mean[0], cuj.components[s].mean[0]],
-                    [upd_km1_s.mean[1], cuj.components[s].mean[1]],
-                    "--",
-                    color=f"C{s}",
-                    alpha=alpha,
-                )
-            )
+# for k, (Zk, pred_k, upd_k) in enumerate(
+#     zip(
+#         Z[plot_range],
+#         tracker_predict_list[plot_range],
+#         tracker_update_list[plot_range],
+#     ),
+#     start_k,
+# ):
+#     # k, (Zk, pred_k, upd_k, ak) = data
+#     (ax.cla() for ax in axs6)
+#     pl = []
+#     gated = tracker.gate(Zk, pred_k)  # probbar(:, k), xbar(:, :, k), Pbar(:, :, :, k));
+#     minG = 1e20 * np.ones(2)
+#     maxG = np.zeros(2)
+#     cond_upd_k = tracker.conditional_update(Zk[gated], pred_k)
+#     beta_k = tracker.association_probabilities(Zk[gated], pred_k)
+#     for s in range(2):
+#         mode_lines[s].set_data = (
+#             np.array([u.components[s].mean[:2] for u in tracker_update_list[:k]]).T,
+#         )
+#         axs6[1].plot(prob_hat[: (k - 1), s], color=f"C{s}")
+#         for j, cuj in enumerate(cond_upd_k):
+#             alpha = 0.7 * beta_k[j] * cuj.weights[s] + 0.3
+#             # csj = mTL * co(s, :) + (1 - mTL) * (beta(j)*skupd(s, j)*co(s, :) + (1 - beta(j)*skupd(s, j)) * ones(1, 3)); % transparancy
+#             upd_km1_s = tracker_update_list[k - 1].components[s]
+#             pl.append(
+#                 axs6[0].plot(
+#                     [upd_km1_s.mean[0], cuj.components[s].mean[0]],
+#                     [upd_km1_s.mean[1], cuj.components[s].mean[1]],
+#                     "--",
+#                     color=f"C{s}",
+#                     alpha=alpha,
+#                 )
+#             )
 
-            pl.append(
-                axs6[1].plot(
-                    [k - 1, k],
-                    [prob_hat[k - 1, s], cuj.weights[s]],
-                    color=f"C{s}",
-                    alpha=alpha,
-                )
-            )
-            # axis([minAx(1), maxAx(1), minAx(2), maxAx(2)])
-            #%alpha(pl, beta(j)*skupd(s, j));
-            # drawnow;
-            pl.append(
-                plot_cov_ellipse2d(
-                    axs6[0],
-                    cuj.components[s].mean[:2],
-                    cuj.components[s].cov[:2, :2],
-                    edgecolor=f"C{s}",
-                    alpha=alpha,
-                )
-            )
+#             pl.append(
+#                 axs6[1].plot(
+#                     [k - 1, k],
+#                     [prob_hat[k - 1, s], cuj.weights[s]],
+#                     color=f"C{s}",
+#                     alpha=alpha,
+#                 )
+#             )
+#             # axis([minAx(1), maxAx(1), minAx(2), maxAx(2)])
+#             #%alpha(pl, beta(j)*skupd(s, j));
+#             # drawnow;
+#             pl.append(
+#                 plot_cov_ellipse2d(
+#                     axs6[0],
+#                     cuj.components[s].mean[:2],
+#                     cuj.components[s].cov[:2, :2],
+#                     edgecolor=f"C{s}",
+#                     alpha=alpha,
+#                 )
+#             )
 
-        Sk = imm_filter.filters[s].innovation_cov([0, 0], pred_k.components[s])
-        # gateData = chol(Sk)' * [cos(thetas); sin(thetas)] * sqrt(tracker.gateSize) + squeeze(xbar(1:2, s, k));
-        # plot(gateData(1, :),gateData(2, :), '.--', 'Color', co(s,:))
-        pl.append(
-            plot_cov_ellipse2d(
-                axs6[0],
-                pred_k.components[s].mean[:2],
-                Sk,
-                n_sigma=tracker.gate_size,
-                edgecolor=f"C{s}",
-            )
-        )
-        meas_sc.set_offsets(Zk)
-        #pl.append(axs6[0].scatter(*Zk.T, color="r", marker="x"))
-        # if ak > 0:
-        #     meas_sc_true.set_offsets(Zk[ak - 1])
-        # else:
-        #     meas_sc_true.set_offsets(np.array([np.nan, np.nan]))
+#         Sk = imm_filter.filters[s].innovation_cov([0, 0], pred_k.components[s])
+#         # gateData = chol(Sk)' * [cos(thetas); sin(thetas)] * sqrt(tracker.gateSize) + squeeze(xbar(1:2, s, k));
+#         # plot(gateData(1, :),gateData(2, :), '.--', 'Color', co(s,:))
+#         pl.append(
+#             plot_cov_ellipse2d(
+#                 axs6[0],
+#                 pred_k.components[s].mean[:2],
+#                 Sk,
+#                 n_sigma=tracker.gate_size,
+#                 edgecolor=f"C{s}",
+#             )
+#         )
+#         meas_sc.set_offsets(Zk)
+#         #pl.append(axs6[0].scatter(*Zk.T, color="r", marker="x"))
+#         # if ak > 0:
+#         #     meas_sc_true.set_offsets(Zk[ak - 1])
+#         # else:
+#         #     meas_sc_true.set_offsets(np.array([np.nan, np.nan]))
 
-        # for j = 1:size(xkupd, 3)
-        #     csj = mTL * co(s, :) + (1 - mTL) * (beta(j)*skupd(s, j)*co(s, :) + (1 - beta(j)*skupd(s, j)) * ones(1, 3)); % transparancy
-        #     plot([k-1, k], [probhat(s, k-1), skupd(s, j)], '--', 'color', csj)
+#         # for j = 1:size(xkupd, 3)
+#         #     csj = mTL * co(s, :) + (1 - mTL) * (beta(j)*skupd(s, j)*co(s, :) + (1 - beta(j)*skupd(s, j)) * ones(1, 3)); % transparancy
+#         #     plot([k-1, k], [probhat(s, k-1), skupd(s, j)], '--', 'color', csj)
 
-        # minGs = min(gateData, [], 2);
-        # minG = minGs .* (minGs < minG) + minG .* (minG < minGs);
-        # maxGs = max(gateData, [], 2);
-        # maxG = maxGs .* (maxGs > maxG) + maxG .* (maxG > maxGs);
+#         # minGs = min(gateData, [], 2);
+#         # minG = minGs .* (minGs < minG) + minG .* (minG < minGs);
+#         # maxGs = max(gateData, [], 2);
+#         # maxG = maxGs .* (maxGs > maxG) + maxG .* (maxG > maxGs);
 
-    # scale = 1
-    # minAx = minG - scale * (maxG - minG);
-    # maxAx = maxG + scale * (maxG - minG);
-    # axis([minAx(1), maxAx(1), minAx(2), maxAx(2)])
-    # %legend()
+#     # scale = 1
+#     # minAx = minG - scale * (maxG - minG);
+#     # maxAx = maxG + scale * (maxG - minG);
+#     # axis([minAx(1), maxAx(1), minAx(2), maxAx(2)])
+#     # %legend()
 
-    # mode probabilities
+#     # mode probabilities
 
-    # axis([1, plotRange(end), 0, 1])
-    # drawnow;
-    plt.pause(plot_pause)
+#     # axis([1, plotRange(end), 0, 1])
+#     # drawnow;
+#     plt.pause(plot_pause)
 
 # %%
 

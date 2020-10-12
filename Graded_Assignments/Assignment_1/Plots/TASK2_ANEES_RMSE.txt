@@ -1,0 +1,10 @@
+ANEESpos = 1.99 with CI = [1.68, 2.34]
+ANEESvel = 1.10 with CI = [1.68, 2.34]
+ANEES = 4.87 with CI = [3.55, 4.48]
+
+NEESpos in interval:  83
+NEESvel in interval:  86
+NEES in interval:  82
+
+posRMSE:  23.46753481540664
+velRMSE:  9.685780154960165
