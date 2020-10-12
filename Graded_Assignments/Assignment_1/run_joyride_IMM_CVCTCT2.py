@@ -121,28 +121,27 @@ if play_movie:
 # %% setup and track
 
 # sensor
-sigma_z = 6
+sigma_z = 9
 clutter_intensity = 1e-5
 PD = 0.75
-gate_size = 3
+gate_size = 2
 
 # dynamic models
-sigma_a_CV = 0.1
-sigma_a_CT = 1
+sigma_a_CV = 0.9
+sigma_a_CT = 0.9
 sigma_omega = 0.05 * np.pi
 
-sigma_a_CT_high = 9
-sigma_omega_high = sigma_omega*2
+sigma_a_CV_high = 6
 
 
 # markov chain
-PI11 = 0.85
-PI22 = 0.85
-PI33 = 0.85
+PI11 = 0.8
+PI22 = 0.8
+PI33 = 0.95
 
-p10 = 0.4  # initvalue for mode 1
-p20 = 0.4  # initvalue for mode 2
-p30 = 0.2  # initvalue for mode 3
+p10 = 0.3  # initvalue for mode 1
+p20 = 0.20  # initvalue for mode 2
+p30 = 0.5  # initvalue for mode 3
 
 PI = np.array([[PI11, (0.5 - PI11/2), (0.5 - PI11/2)], [(0.5 - PI22/2), PI22, (0.5-PI22/2)], [(0.5 - PI33/2),(0.5 - PI33/2),PI33]])
 assert np.allclose(np.sum(PI, axis=1), 1), "rows of PI must sum to 1"
@@ -165,8 +164,8 @@ assert np.allclose(
 measurement_model = measurementmodels.CartesianPosition(sigma_z, state_dim=5)
 dynamic_models: List[dynamicmodels.DynamicModel] = []
 dynamic_models.append(dynamicmodels.WhitenoiseAccelleration(sigma_a_CV, n=5))
+dynamic_models.append(dynamicmodels.WhitenoiseAccelleration(sigma_a_CV_high, n=5))
 dynamic_models.append(dynamicmodels.ConstantTurnrate(sigma_a_CT, sigma_omega))
-dynamic_models.append(dynamicmodels.ConstantTurnrate(sigma_a_CT_high, sigma_omega_high))
 ekf_filters = []
 ekf_filters.append(ekf.EKF(dynamic_models[0], measurement_model))
 ekf_filters.append(ekf.EKF(dynamic_models[1], measurement_model))
@@ -259,8 +258,8 @@ for i in range(0,len(x_hat.T[:2][0]), 25):
         bbox=bbox_chosen,fontsize=text_size-20)
 # probabilities
 axs3[1].plot(time, prob_hat[:,0], label="CV")
-axs3[1].plot(time, prob_hat[:,1], label="CT")
-axs3[1].plot(time, prob_hat[:,2], label="CT HIGH")
+axs3[1].plot(time, prob_hat[:,1], label="CV High")
+axs3[1].plot(time, prob_hat[:,2], label="CT")
 axs3[1].set_ylim([0, 1])
 axs3[1].tick_params(axis='both', which='major', labelsize=40)
 axs3[1].set_ylabel("mode probability",fontsize=text_size)
