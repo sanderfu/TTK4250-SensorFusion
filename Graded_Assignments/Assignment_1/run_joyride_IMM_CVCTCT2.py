@@ -127,18 +127,18 @@ PD = 0.75
 gate_size = 3
 
 # dynamic models
-sigma_a_CV = 2
-sigma_a_CT = 3
+sigma_a_CV = 0.1
+sigma_a_CT = 1
 sigma_omega = 0.05 * np.pi
 
-sigma_a_CT_high = 4
+sigma_a_CT_high = 9
 sigma_omega_high = sigma_omega*2
 
 
 # markov chain
-PI11 = 0.95
-PI22 = 0.95
-PI33 = 0.95
+PI11 = 0.85
+PI22 = 0.85
+PI33 = 0.85
 
 p10 = 0.4  # initvalue for mode 1
 p20 = 0.4  # initvalue for mode 2
@@ -149,8 +149,8 @@ assert np.allclose(np.sum(PI, axis=1), 1), "rows of PI must sum to 1"
 
 mean_init = np.array([7096,3627, 0, 0, 0])
 cov_init = np.zeros((5, 5))
-cov_init[[0, 1], [0, 1]] = 2 * sigma_z ** 2
-cov_init[[2, 3], [2, 3]] = 10 ** 2
+cov_init[[0, 1], [0, 1]] = 25 ** 2
+cov_init[[2, 3], [2, 3]] = 3 ** 2
 cov_init[4,4] = 0.1
 
 mode_probabilities_init = np.array([p10, p20, p30])
@@ -236,52 +236,60 @@ ANEES = np.mean(NEES)
 
 # %% plots
 # trajectory
+
+text_size = 60
+
 fig3, axs3 = plt.subplots(1, 2, num=3, clear=True)
 axs3[0].plot(*x_hat.T[:2], label=r"$\hat x$")
 axs3[0].plot(*Xgt.T[:2], label="$x$")
 axs3[0].set_title(
-    f"RMSE(pos, vel) = ({posRMSE:.3f}, {velRMSE:.3f})\npeak_dev(pos, vel) = ({peak_pos_deviation:.3f}, {peak_vel_deviation:.3f})"
+    f"RMSE(pos, vel) = ({posRMSE:.3f}, {velRMSE:.3f})\npeak_dev(pos, vel) = ({peak_pos_deviation:.3f}, {peak_vel_deviation:.3f})",fontsize=text_size
 )
 axs3[0].axis("equal")
+axs3[0].tick_params(axis='both', which='major', labelsize=40)
 bbox_CV={'facecolor': 'blue', 'alpha': 0.5, 'pad': 5}
 bbox_CT={'facecolor': 'green', 'alpha': 0.5, 'pad': 5}
 bbox_chosen = {'facecolor': 'white', 'alpha': 0.5, 'pad': 5}
-for i in range(0,len(x_hat.T[:2][0]), 10):
+for i in range(0,len(x_hat.T[:2][0]), 25):
     #if prob_hat[i,0]>prob_hat[i,1]:
     #    bbox_chosen=bbox_CV
     #else:
     #    bbxo_chosen = bbox_CT
     axs3[0].text(x_hat.T[0][i], x_hat.T[1][i], f"t: {round(time[i],1)}",  style='oblique',
-        bbox=bbox_chosen)
+        bbox=bbox_chosen,fontsize=text_size-20)
 # probabilities
 axs3[1].plot(time, prob_hat[:,0], label="CV")
 axs3[1].plot(time, prob_hat[:,1], label="CT")
 axs3[1].plot(time, prob_hat[:,2], label="CT HIGH")
 axs3[1].set_ylim([0, 1])
-axs3[1].set_ylabel("mode probability")
-axs3[1].set_xlabel("time")
-axs3[1].legend()
+axs3[1].tick_params(axis='both', which='major', labelsize=40)
+axs3[1].set_ylabel("mode probability",fontsize=text_size)
+axs3[1].set_xlabel("time",fontsize=text_size)
+axs3[1].legend(fontsize=text_size-20)
 plt.show()
 
 # NEES
 fig4, axs4 = plt.subplots(3, sharex=True, num=4, clear=True)
 axs4[0].plot(time, NEESpos)
 axs4[0].plot([0, time[-1]], np.repeat(CI2[None], 2, 0), "--r")
-axs4[0].set_ylabel("NEES pos")
+axs4[0].set_ylabel("NEES pos",fontsize=text_size)
 inCIpos = np.mean((CI2[0] <= NEESpos) * (NEESpos <= CI2[1]))
-axs4[0].set_title(f"{inCIpos*100:.1f}% inside {confprob*100:.1f}% CI")
+axs4[0].set_title(f"{inCIpos*100:.1f}% inside {confprob*100:.1f}% CI",fontsize=text_size)
+axs4[0].tick_params(axis='both', which='major', labelsize=40)
 
 axs4[1].plot(time, NEESvel)
 axs4[1].plot([0, time[-1]], np.repeat(CI2[None], 2, 0), "--r")
-axs4[1].set_ylabel("NEES vel")
+axs4[1].set_ylabel("NEES vel",fontsize=text_size)
 inCIvel = np.mean((CI2[0] <= NEESvel) * (NEESvel <= CI2[1]))
-axs4[1].set_title(f"{inCIvel*100:.1f}% inside {confprob*100:.1f}% CI")
+axs4[1].set_title(f"{inCIvel*100:.1f}% inside {confprob*100:.1f}% CI",fontsize=text_size)
+axs4[1].tick_params(axis='both', which='major', labelsize=40)
 
 axs4[2].plot(time, NEES)
 axs4[2].plot([0, time[-1]], np.repeat(CI4[None], 2, 0), "--r")
-axs4[2].set_ylabel("NEES")
+axs4[2].set_ylabel("NEES",fontsize=text_size)
 inCI = np.mean((CI2[0] <= NEES) * (NEES <= CI2[1]))
-axs4[2].set_title(f"{inCI*100:.1f}% inside {confprob*100:.1f}% CI")
+axs4[2].set_title(f"{inCI*100:.1f}% inside {confprob*100:.1f}% CI",fontsize=text_size)
+axs4[2].tick_params(axis='both', which='major', labelsize=40)
 
 print(f"ANEESpos = {ANEESpos:.2f} with CI = [{CI2K[0]:.2f}, {CI2K[1]:.2f}]")
 print(f"ANEESvel = {ANEESvel:.2f} with CI = [{CI2K[0]:.2f}, {CI2K[1]:.2f}]")
@@ -290,10 +298,14 @@ print(f"ANEES = {ANEES:.2f} with CI = [{CI4K[0]:.2f}, {CI4K[1]:.2f}]")
 # errors
 fig5, axs5 = plt.subplots(2, num=5, clear=True)
 axs5[0].plot(time, np.linalg.norm(x_hat[:, :2] - Xgt[:, :2], axis=1))
-axs5[0].set_ylabel("position error")
+axs5[0].set_ylabel("position error [m]",fontsize=text_size)
+axs5[0].set_xlabel("time [s]",fontsize=text_size)
+axs5[0].tick_params(axis='both', which='major', labelsize=40)
 
 axs5[1].plot(time, np.linalg.norm(x_hat[:, 2:4] - Xgt[:, 2:4], axis=1))
-axs5[1].set_ylabel("velocity error")
+axs5[1].set_ylabel("velocity error [m/s]",fontsize=text_size)
+axs5[1].set_xlabel("time [s]",fontsize=text_size)
+axs5[1].tick_params(axis='both', which='major', labelsize=40)
 
 plt.show()
 

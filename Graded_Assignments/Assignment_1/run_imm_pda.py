@@ -146,8 +146,8 @@ assert np.allclose(np.sum(PI, axis=1), 1), "rows of PI must sum to 1"
 
 mean_init = np.array([0,0, 0, 0, 0])
 cov_init = np.zeros((5, 5))
-cov_init[[0, 1], [0, 1]] = 2 * sigma_z ** 2
-cov_init[[2, 3], [2, 3]] = 10 ** 2
+cov_init[[0, 1], [0, 1]] = 25 ** 2
+cov_init[[2, 3], [2, 3]] = 3 ** 2
 cov_init[4,4] = 0.1
 
 mode_probabilities_init = np.array([p10, (1 - p10)])
@@ -246,17 +246,19 @@ fig3, axs3 = plt.subplots(1, 2, num=3, clear=True)
 axs3[0].plot(*x_hat.T[:2], label=r"$\hat x$")
 axs3[0].plot(*Xgt.T[:2], label="$x$")
 axs3[0].set_title(
-    f"RMSE(pos, vel) = ({posRMSE:.3f}, {velRMSE:.3f})\npeak_dev(pos, vel) = ({peak_pos_deviation:.3f}, {peak_vel_deviation:.3f})"
+    f"RMSE(pos, vel) = ({posRMSE:.3f}, {velRMSE:.3f})\npeak_dev(pos, vel) = ({peak_pos_deviation:.3f}, {peak_vel_deviation:.3f})",fontsize=text_size
 )
+axs3[0].tick_params(axis='both', which='major', labelsize=40)
 axs3[0].axis("equal")
 for i in range(0,len(x_hat.T[:2][0]), 10):
     axs3[0].text(x_hat.T[0][i], x_hat.T[1][i], f"t: {i*Ts}",  style='oblique',
-        bbox={'facecolor': 'white', 'alpha': 0.5, 'pad': 5})
+        bbox={'facecolor': 'white', 'alpha': 0.5, 'pad': 5},fontsize=text_size-20)
 # probabilities
 axs3[1].plot(np.arange(K) * Ts, prob_hat)
 axs3[1].set_ylim([0, 1])
-axs3[1].set_ylabel("mode probability")
-axs3[1].set_xlabel("time")
+axs3[1].set_ylabel("mode probability",fontsize=text_size)
+axs3[1].set_xlabel("time",fontsize=text_size)
+axs3[1].tick_params(axis='both', which='major', labelsize=40)
 
 fig9, axs9 = plt.subplots(1, 1, num=9, clear=True)
 axs9.plot(np.arange(K) * Ts,prob_hat[:,0], label="CV")
@@ -273,18 +275,21 @@ axs4[0].plot([0, (K - 1) * Ts], np.repeat(CI2[None], 2, 0), "--r")
 axs4[0].set_ylabel("NEES pos",fontsize=text_size)
 inCIpos = np.mean((CI2[0] <= NEESpos) * (NEESpos <= CI2[1]))
 axs4[0].set_title(f"{inCIpos*100:.1f}% inside {confprob*100:.1f}% CI",fontsize=text_size)
+axs4[0].tick_params(axis='both', which='major', labelsize=40)
 
 axs4[1].plot(np.arange(K) * Ts, NEESvel)
 axs4[1].plot([0, (K - 1) * Ts], np.repeat(CI2[None], 2, 0), "--r")
 axs4[1].set_ylabel("NEES vel",fontsize=text_size)
 inCIvel = np.mean((CI2[0] <= NEESvel) * (NEESvel <= CI2[1]))
 axs4[1].set_title(f"{inCIvel*100:.1f}% inside {confprob*100:.1f}% CI",fontsize=text_size)
+axs4[1].tick_params(axis='both', which='major', labelsize=40)
 
 axs4[2].plot(np.arange(K) * Ts, NEES)
 axs4[2].plot([0, (K - 1) * Ts], np.repeat(CI4[None], 2, 0), "--r")
 axs4[2].set_ylabel("NEES",fontsize=text_size)
 inCI = np.mean((CI2[0] <= NEES) * (NEES <= CI2[1]))
 axs4[2].set_title(f"{inCI*100:.1f}% inside {confprob*100:.1f}% CI",fontsize=text_size)
+axs4[2].tick_params(axis='both', which='major', labelsize=40)
 
 print(f"ANEESpos = {ANEESpos:.2f} with CI = [{CI2K[0]:.2f}, {CI2K[1]:.2f}]")
 print(f"ANEESvel = {ANEESvel:.2f} with CI = [{CI2K[0]:.2f}, {CI2K[1]:.2f}]")
@@ -296,10 +301,12 @@ fig5, axs5 = plt.subplots(2, num=5, clear=True)
 axs5[0].plot(np.arange(K) * Ts, np.linalg.norm(x_hat[:, :2] - Xgt[:, :2], axis=1))
 axs5[0].set_ylabel("position error [m]",fontsize=text_size)
 axs5[0].set_xlabel("time [s]",fontsize=text_size)
+axs5[0].tick_params(axis='both', which='major', labelsize=40)
 
 axs5[1].plot(np.arange(K) * Ts, np.linalg.norm(x_hat[:, 2:4] - Xgt[:, 2:4], axis=1))
 axs5[1].set_ylabel("velocity error [m/s]",fontsize=text_size)
 axs5[1].set_xlabel("time [s]",fontsize=text_size)
+axs5[1].tick_params(axis='both', which='major', labelsize=40)
 
 
 plt.show()
