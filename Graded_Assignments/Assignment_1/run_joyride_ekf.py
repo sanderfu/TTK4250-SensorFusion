@@ -122,9 +122,9 @@ PD = 0.90
 gate_size = 5
 
 # dynamic models
-sigma_a_CV = 0.5
-sigma_a_CT = 3
-sigma_omega = 0.0005 * np.pi
+sigma_a_CV = 1.45
+sigma_a_CT = 1.45
+sigma_omega = 0.00005 * np.pi
 
 
 
