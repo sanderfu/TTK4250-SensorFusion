@@ -128,7 +128,7 @@ gate_size = 4
 
 # dynamic models
 sigma_a_CV = 1
-sigma_a_CT = 7
+sigma_a_CT = 3
 sigma_omega = 0.05 * np.pi
 
 

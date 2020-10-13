@@ -131,7 +131,7 @@ sigma_a_CV = 0.9
 sigma_a_CT = 0.9
 sigma_omega = 0.05 * np.pi
 
-sigma_a_CV_high = 6
+sigma_a_CV_high = 4
 
 
 # markov chain
