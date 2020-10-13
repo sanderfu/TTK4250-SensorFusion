@@ -133,7 +133,6 @@ sigma_omega = 0.05 * np.pi
 
 sigma_a_CV_high = 6
 
-
 # markov chain
 PI11 = 0.8
 PI22 = 0.8
@@ -146,7 +145,7 @@ p30 = 0.5  # initvalue for mode 3
 PI = np.array([[PI11, (0.5 - PI11/2), (0.5 - PI11/2)], [(0.5 - PI22/2), PI22, (0.5-PI22/2)], [(0.5 - PI33/2),(0.5 - PI33/2),PI33]])
 assert np.allclose(np.sum(PI, axis=1), 1), "rows of PI must sum to 1"
 
-mean_init = np.array([7096,3627, 0, 0, 0])
+mean_init = np.array([7000,3600, 0, 0, 0])
 cov_init = np.zeros((5, 5))
 cov_init[[0, 1], [0, 1]] = 25 ** 2
 cov_init[[2, 3], [2, 3]] = 3 ** 2

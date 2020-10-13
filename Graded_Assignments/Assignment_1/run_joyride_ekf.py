@@ -128,7 +128,7 @@ sigma_omega = 0.00005 * np.pi
 
 
 
-mean_init_CV = np.array([7096,3627, 0, 0, 0])
+mean_init_CV = np.array([7000,3600, 0, 0, 0])
 cov_init_CV = np.zeros((5, 5))
 cov_init_CV[[0, 1], [0, 1]] = 2 * sigma_z ** 2
 cov_init_CV[[2, 3], [2, 3]] = 10 ** 2
