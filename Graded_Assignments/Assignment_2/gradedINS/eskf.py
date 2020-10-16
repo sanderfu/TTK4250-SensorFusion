@@ -44,6 +44,7 @@ class ESKF:
     S_a: np.ndarray = np.eye(3)
     S_g: np.ndarray = np.eye(3)
     debug: bool = True
+    taylor_matrix_exponential:  bool = True
 
     g: np.ndarray = np.array([0, 0, 9.82])  # Ja, i NED-land, der kan alt gå an
 
@@ -113,23 +114,30 @@ class ESKF:
             ), "ESKF.predict_nominal: Quaternion not normalized and norm failed to catch it."
 
         R = quaternion_to_rotation_matrix(quaternion, debug=self.debug)
-
-        position_prediction = np.zeros((3,))  # TODO: Calculate predicted position
-        velocity_prediction = np.zeros((3,))  # TODO: Calculate predicted velocity
-
-        quaternion_prediction = np.array(
-            [1, 0, 0, 0]
-        )  # TODO: Calculate predicted quaternion
+        a = R@acceleration
+        position_prediction = position + Ts*velocity + (Ts**2)/2*acceleration  # DONE: Calculate predicted position
+        velocity_prediction = velocity + Ts*acceleration  # DONE: Calculate predicted velocity
+        
+        rotation_vector_increment = Ts*omega
+        scalar_part = np.array([np.cos(la.norm(rotation_vector_increment,2))/2])
+        vector_part = np.sin(la.norm(rotation_vector_increment,2))*rotation_vector_increment/la.norm(rotation_vector_increment,2)
+        local_rotation_vector_increment_quaternion=np.concatenate([scalar_part,vector_part])
+        #Comment to the above: Was in hint this formula but no idea how to relate it to the book.
+        
+        quaternion_prediction = quaternion_product(quaternion,local_rotation_vector_increment_quaternion)
 
         # Normalize quaternion
-        quaternion_prediction = quaternion_prediction  # TODO: Normalize
-
-        acceleration_bias_prediction = np.zeros(
-            (3,)
-        )  # TODO: Calculate predicted acceleration bias
-        gyroscope_bias_prediction = np.zeros(
-            (3,)
-        )  # TODO: Calculate predicted gyroscope bias
+        quaternion_prediction = quaternion_prediction/la.norm(quaternion_prediction,2)  # DONE: Normalize
+        if self.debug:
+            assert np.allclose(
+                la.norm(quaternion_prediction), 1, rtol=0, atol=1e-15
+                ), "ESKF.predict_nominal: Quaternion predicition not normalized."
+        
+        
+        acceleration_bias_prediction = acceleration_bias - self.p_acc*acceleration_bias # DONE: Calculate predicted acceleration bias
+        gyroscope_bias_prediction = gyroscope_bias - self.p_gyro*gyroscope_bias  #DONE: Calculate predicted gyro bias
+        #Comment to above: If confused, see eq. 10.58 and section 10.2.2
+        
 
         x_nominal_predicted = np.concatenate(
             (
@@ -176,15 +184,16 @@ class ESKF:
 
         # Allocate the matrix
         A = np.zeros((15, 15))
-
-        # Set submatrices
-        A[POS_IDX * VEL_IDX] = np.zeros((3,))
-        A[VEL_IDX * ERR_ATT_IDX] = np.zeros((3,))
-        A[VEL_IDX * ERR_ACC_BIAS_IDX] = np.zeros((3,))
-        A[ERR_ATT_IDX * ERR_ATT_IDX] = np.zeros((3,))
-        A[ERR_ATT_IDX * ERR_GYRO_BIAS_IDX] = np.zeros((3,))
-        A[ERR_ACC_BIAS_IDX * ERR_ACC_BIAS_IDX] = np.zeros((3,))
-        A[ERR_GYRO_BIAS_IDX * ERR_GYRO_BIAS_IDX] = np.zeros((3,))
+        
+        #Eq. 10.68
+        # Set submatrices (assuming acceleration and omega debiased)
+        A[POS_IDX * VEL_IDX] = np.diag([1]*3)
+        A[VEL_IDX * ERR_ATT_IDX] = -R@cross_product_matrix(acceleration)
+        A[VEL_IDX * ERR_ACC_BIAS_IDX] = -R
+        A[ERR_ATT_IDX * ERR_ATT_IDX] = -cross_product_matrix(omega)
+        A[ERR_ATT_IDX * ERR_GYRO_BIAS_IDX] = -np.diag([1]*3)
+        A[ERR_ACC_BIAS_IDX * ERR_ACC_BIAS_IDX] = -self.p_acc*np.diag([1]*3)
+        A[ERR_GYRO_BIAS_IDX * ERR_GYRO_BIAS_IDX] = -self.p_gyro*np.diag([1]*3)
 
         # Bias correction
         A[VEL_IDX * ERR_ACC_BIAS_IDX] = A[VEL_IDX * ERR_ACC_BIAS_IDX] @ self.S_a
@@ -216,8 +225,12 @@ class ESKF:
         ), f"ESKF.Gerr: x_nominal shape incorrect {x_nominal.shape}"
 
         R = quaternion_to_rotation_matrix(x_nominal[ATT_IDX], debug=self.debug)
-
-        G = np.zeros((15, 12))
+        
+        #Eq. 10.68
+        identity3x3 = np.diag([1]*3)
+        lower_part = la.block_diag(-R,-identity3x3,identity3x3,identity3x3)
+        upper_part = np.zeros((3,12))
+        G = np.vstack((upper_part,lower_part))
 
         assert G.shape == (15, 12), f"ESKF.Gerr: G-matrix shape incorrect {G.shape}"
         return G
@@ -258,13 +271,32 @@ class ESKF:
 
         A = self.Aerr(x_nominal, acceleration, omega)
         G = self.Gerr(x_nominal)
-
-        V = np.zeros((30, 30))
+        
+        #Using same names as in Eq. 10.69
+        V_thilde = np.diag([self.sigma_acc**2]*3)
+        Theta_thilde = np.diag([self.sigma_gyro**2]*3)
+        A_thilde = np.diag([self.sigma_acc_bias**2]*3)
+        Omega_thilde = np.diag([self.sigma_gyro_bias**2]*3)
+        
+        Q_thilde = la.block_diag(V_thilde,Theta_thilde,A_thilde,Omega_thilde)
+        
+        # Using Van Loan forumla Eq. 4.63
+        #V = np.matrix([[-A, G@Q_thilde@G.T],[np.zeros(A.shape),A.T]])
+        V_top = np.concatenate((-A, G@Q_thilde@G.T),axis=1)
+        V_bottom = np.concatenate((np.zeros(A.shape),A.T),axis=1)
+        V=np.vstack((V_top,V_bottom))
         assert V.shape == (
             30,
             30,
         ), f"ESKF.discrete_error_matrices: Van Loan matrix shape incorrect {omega.shape}"
-        VanLoanMatrix = la.expm(V)  # This can be slow...
+        if self.taylor_matrix_exponential:
+            #Third order taylor approximation
+            VanLoanMatrix = np.diag([1]*30)+V+1/2*V@V
+            
+            #Have to make sure is positive definite as this is requirement
+            assert np.all(la.eigvals(VanLoanMatrix) > 0), "ESKF.discrete_error_matrices: Second order taylor approximation fails to be positive definite"
+        else:
+            VanLoanMatrix = la.expm(V)  # This can be slow...
 
         Ad = np.zeros((15, 15))
         GQGd = np.zeros((15, 15))
@@ -372,11 +404,13 @@ class ESKF:
         gyro_bias = self.S_g @ x_nominal[GYRO_BIAS_IDX]
 
         # debias IMU measurements
-        acceleration = np.zeros((3,))
-        omega = np.zeros((3,))
+        acceleration = r_z_acc-acc_bias
+        omega = r_z_gyro-gyro_bias
 
         # perform prediction
-        x_nominal_predicted = np.zeros((16,))
+        x_nominal_predicted = self.predict_nominal(x_nominal,acceleration,omega,Ts)
+        test_Gerr = self.Gerr(x_nominal)
+        test_discrete_error_matrices = self.discrete_error_matrices(x_nominal,acceleration,omega,Ts)
         P_predicted = np.zeros((15, 15))
 
         assert x_nominal_predicted.shape == (
