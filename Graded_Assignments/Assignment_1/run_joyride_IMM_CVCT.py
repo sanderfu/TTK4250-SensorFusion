@@ -141,7 +141,7 @@ p10 = 0.9  # initvalue for mode probabilities
 PI = np.array([[PI11, (1 - PI11)], [(1 - PI22), PI22]])
 assert np.allclose(np.sum(PI, axis=1), 1), "rows of PI must sum to 1"
 
-mean_init = np.array([7096,3627, 0, 0, 0])
+mean_init = np.array([7000,3600, 0, 0, 0])
 cov_init = np.zeros((5, 5))
 cov_init[[0, 1], [0, 1]] = 2 * sigma_z ** 2
 cov_init[[2, 3], [2, 3]] = 10 ** 2
