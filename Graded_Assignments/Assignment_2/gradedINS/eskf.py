@@ -114,13 +114,13 @@ class ESKF:
             ), "ESKF.predict_nominal: Quaternion not normalized and norm failed to catch it."
 
         R = quaternion_to_rotation_matrix(quaternion, debug=self.debug)
-        a = R@acceleration
+        a = R@acceleration+self.g
         position_prediction = position + Ts*velocity + (Ts**2)/2*acceleration  # DONE: Calculate predicted position
         velocity_prediction = velocity + Ts*acceleration  # DONE: Calculate predicted velocity
         
         rotation_vector_increment = Ts*omega
-        scalar_part = np.array([np.cos(la.norm(rotation_vector_increment,2))/2])
-        vector_part = np.sin(la.norm(rotation_vector_increment,2))*rotation_vector_increment/la.norm(rotation_vector_increment,2)
+        scalar_part = np.array([np.cos(la.norm(rotation_vector_increment,2)/2)])
+        vector_part = np.sin(la.norm(rotation_vector_increment,2)/2)*rotation_vector_increment/la.norm(rotation_vector_increment,2)
         local_rotation_vector_increment_quaternion=np.concatenate([scalar_part,vector_part])
         #Comment to the above: Was in hint this formula but no idea how to relate it to the book.
         
@@ -134,8 +134,8 @@ class ESKF:
                 ), "ESKF.predict_nominal: Quaternion predicition not normalized."
         
         
-        acceleration_bias_prediction = acceleration_bias - self.p_acc*acceleration_bias # DONE: Calculate predicted acceleration bias
-        gyroscope_bias_prediction = gyroscope_bias - self.p_gyro*gyroscope_bias  #DONE: Calculate predicted gyro bias
+        acceleration_bias_prediction = acceleration_bias - self.p_acc*acceleration_bias*Ts # DONE: Calculate predicted acceleration bias
+        gyroscope_bias_prediction = gyroscope_bias - self.p_gyro*gyroscope_bias*Ts  #DONE: Calculate predicted gyro bias
         #Comment to above: If confused, see eq. 10.58 and section 10.2.2
         
 
@@ -272,7 +272,7 @@ class ESKF:
         A = self.Aerr(x_nominal, acceleration, omega)
         G = self.Gerr(x_nominal)
         
-        #Using same names as in Eq. 10.69
+        #Using same names as in Eq. 10.69, assuming noise white (continous)
         V_thilde = np.diag([self.sigma_acc**2]*3)
         Theta_thilde = np.diag([self.sigma_gyro**2]*3)
         A_thilde = np.diag([self.sigma_acc_bias**2]*3)
@@ -281,16 +281,15 @@ class ESKF:
         Q_thilde = la.block_diag(V_thilde,Theta_thilde,A_thilde,Omega_thilde)
         
         # Using Van Loan forumla Eq. 4.63
-        #V = np.matrix([[-A, G@Q_thilde@G.T],[np.zeros(A.shape),A.T]])
         V_top = np.concatenate((-A, G@Q_thilde@G.T),axis=1)
         V_bottom = np.concatenate((np.zeros(A.shape),A.T),axis=1)
-        V=np.vstack((V_top,V_bottom))
+        V=np.vstack((V_top,V_bottom))*Ts
         assert V.shape == (
             30,
             30,
         ), f"ESKF.discrete_error_matrices: Van Loan matrix shape incorrect {omega.shape}"
         if self.taylor_matrix_exponential:
-            #Third order taylor approximation
+            #Second order taylor approximation
             VanLoanMatrix = np.diag([1]*30)+V+1/2*V@V
             
             #Have to make sure is positive definite as this is requirement
@@ -298,8 +297,19 @@ class ESKF:
         else:
             VanLoanMatrix = la.expm(V)  # This can be slow...
 
-        Ad = np.zeros((15, 15))
-        GQGd = np.zeros((15, 15))
+        V2_ROWS_IDX = CatSlice(start=0,stop=15)
+        V2_COLS_IDX = CatSlice(start=15,stop=30)
+        V2 = VanLoanMatrix[V2_ROWS_IDX * V2_COLS_IDX]
+        
+        V1_ROWS_IDX = CatSlice(start=15,stop=30)
+        V1_COLS_IDX = CatSlice(start=15,stop=30)
+        V1 = VanLoanMatrix[V1_ROWS_IDX * V1_COLS_IDX]
+        
+        #See result from Van Loan in task desc and Eq. 4.59
+        Ad = V1.T
+        
+        #Thm 4.5.1 and Thm 4.5.2 (Van Loan)
+        GQGd = V1.T@V2
 
         assert Ad.shape == (
             15,

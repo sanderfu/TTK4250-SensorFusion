@@ -47,7 +47,6 @@ def quaternion_product(ql: np.ndarray, qr: np.ndarray) -> np.ndarray:
     quaternion[0] = eta_left*eta_right - np.dot(epsilon_left.T, epsilon_right)
     quaternion[1:4] = eta_right*epsilon_left + eta_left*epsilon_right + np.cross(epsilon_left, epsilon_right)
 
-    quaternion = quaternion/np.sum(quaternion) #Ensure unity size
 
     # Ensure result is of correct shape
     quaternion = quaternion.ravel()
@@ -62,7 +61,6 @@ def test_quaternion_product():
 
     res = quaternion_product(quat1, quat2)
     true_product = np.array([-0.89332,-0.00125,-0.42776,0.14194])
-    true_product = true_product/np.sum(true_product)
     assert(np.allclose(res, true_product, atol=0.0001)), "Does not return correct quaternion product."
     print("Test passed, quaternion product")
 test_quaternion_product()
