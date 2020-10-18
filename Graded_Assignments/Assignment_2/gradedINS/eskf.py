@@ -781,16 +781,16 @@ class ESKF:
         NEES_vel = d_x[VEL_IDX].T@la.solve(P_vel,d_x[VEL_IDX])
         
         # DONE: NEES attitude
-        P_att = P[ATT_IDX * ATT_IDX]
-        NEES_att = d_x[ATT_IDX].T@la.solve(P_att,d_x[ATT_IDX])
+        P_att = P[ERR_ATT_IDX * ERR_ATT_IDX]
+        NEES_att = d_x[ERR_ATT_IDX].T@la.solve(P_att,d_x[ERR_ATT_IDX])
         
         # DONE: NEES accelerometer bias
-        P_acc_bias = P[ACC_BIAS_IDX * ACC_BIAS_IDX]
-        NEES_accbias = d_x[ACC_BIAS_IDX].T@la.solve(P_acc_bias,d_x[ACC_BIAS_IDX])
+        P_acc_bias = P[ERR_ACC_BIAS_IDX * ERR_ACC_BIAS_IDX]
+        NEES_accbias = d_x[ERR_ACC_BIAS_IDX].T@la.solve(P_acc_bias,d_x[ERR_ACC_BIAS_IDX])
         
         # DONE: NEES gyroscope bias
-        P_gyro_bias = P[GYRO_BIAS_IDX * GYRO_BIAS_IDX]
-        NEES_gyrobias = d_x[GYRO_BIAS_IDX].T@la.solve(P_gyro_bias,d_x[GYRO_BIAS_IDX])
+        P_gyro_bias = P[ERR_GYRO_BIAS_IDX * ERR_GYRO_BIAS_IDX]
+        NEES_gyrobias = d_x[ERR_GYRO_BIAS_IDX].T@la.solve(P_gyro_bias,d_x[ERR_GYRO_BIAS_IDX])
 
         NEESes = np.array(
             [NEES_all, NEES_pos, NEES_vel, NEES_att, NEES_accbias, NEES_gyrobias]
