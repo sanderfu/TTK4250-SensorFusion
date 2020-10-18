@@ -178,12 +178,13 @@ class UKF:
         """Update ekfstate with z in sensor_state"""
 
         x, P = ekfstate
+        m = self.sensor_model.m
         sigmas = self.__get_sigmas(x, P)
-        sigmas_out = np.array([self.sensor_model.h(x) for x in sigmas.T]).T
+        sigmas_out = np.array([self.sensor_model.h(sig) for sig in sigmas.T]).T
 
         import ipdb
-        z_upd = np.zeros(self.n_dim)
-        S_upd = np.zeros((self.n_dim, self.n_dim))
+        z_upd = np.zeros(m)
+        S_upd = np.zeros((m, m))
         ipdb.set_trace()
         for i in range(self.n_sig):
             z_upd += self.mean_weights[i]*sigmas_out[i]

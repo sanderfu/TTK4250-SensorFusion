@@ -44,7 +44,7 @@ class ESKF:
     S_a: np.ndarray = np.eye(3)
     S_g: np.ndarray = np.eye(3)
     debug: bool = True
-    taylor_matrix_exponential:  bool = True
+    taylor_matrix_exponential:  bool = False
 
     g: np.ndarray = np.array([0, 0, 9.82])  # Ja, i NED-land, der kan alt gå an
 
@@ -115,8 +115,8 @@ class ESKF:
 
         R = quaternion_to_rotation_matrix(quaternion, debug=self.debug)
         a = R@acceleration+self.g
-        position_prediction = position + Ts*velocity + (Ts**2)/2*acceleration  # DONE: Calculate predicted position
-        velocity_prediction = velocity + Ts*acceleration  # DONE: Calculate predicted velocity
+        position_prediction = position + Ts*velocity + (Ts**2)/2*a  # DONE: Calculate predicted position
+        velocity_prediction = velocity + Ts*a  # DONE: Calculate predicted velocity
         
         rotation_vector_increment = Ts*omega
         scalar_part = np.array([np.cos(la.norm(rotation_vector_increment,2)/2)])
@@ -363,6 +363,7 @@ class ESKF:
 
         Ad, GQGd = self.discrete_error_matrices(x_nominal, acceleration, omega, Ts)
 
+        temp = Ad@P@Ad.T
         #Ordinary KF cov predict (Algorithm 2, Line 4, p. 79)
         P_predicted = Ad@P@Ad.T+GQGd
 
@@ -473,7 +474,7 @@ class ESKF:
         x_injected[INJ_IDX]+=delta_x[DTX_IDX]
         
         # DONE: Inject attitude
-        delta_theta = delta_x[DELTA_ATT_IDX]
+        delta_theta = delta_x[ERR_ATT_IDX]
         delta_quat = np.concatenate(([1],1/2*delta_theta))
         x_injected[ATT_IDX]=quaternion_product(x_injected[ATT_IDX],delta_quat)
         

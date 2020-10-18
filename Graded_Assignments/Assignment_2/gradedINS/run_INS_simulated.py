@@ -108,7 +108,7 @@ z_gyroscope = loaded_data["zGyro"].T
 
 
 dt = np.mean(np.diff(timeIMU))
-steps = len(z_acceleration)
+steps = 500# len(z_acceleration)
 gnss_steps = len(z_GNSS)
 
 # %% Measurement noise
@@ -184,11 +184,10 @@ P_pred[0][ERR_GYRO_BIAS_IDX ** 2] = np.eye(3)# TODO
 P_pred[0] *= 100
 
 # %% Test: you can run this cell to test your implementation
-dummy = eskf.predict(x_pred[0], P_pred[0], z_acceleration[0], z_gyroscope[0], dt)
-dummy = eskf.update_GNSS_position(x_pred[0], P_pred[0], z_GNSS[0], R_GNSS, lever_arm)
+#dummy = eskf.predict(x_pred[0], P_pred[0], z_acceleration[0], z_gyroscope[0], dt)
+#dummy = eskf.update_GNSS_position(x_pred[0], P_pred[0], z_GNSS[0], R_GNSS, lever_arm)
 # %% Run estimation
 # run this file with 'python -O run_INS_simulated.py' to turn of assertions and get about 8/5 speed increase for longer runs
-steps = 500
 N: int = steps # TODO: choose a small value to begin with (500?), and gradually increase as you OK results
 doGNSS: bool = True  # TODO: Set this to False if you want to check that the predictions make sense over reasonable time lenghts
 
@@ -196,11 +195,11 @@ GNSSk: int = 0  # keep track of current step in GNSS measurements
 for k in tnrange(N):
     if doGNSS and timeIMU[k] >= timeGNSS[GNSSk]:
 
-        x_est[k,:], P_est[k] = eskf.update_GNSS_position(x_pred[k], P_pred[k], z_GNSS[k], R_GNSS, lever_arm)
-        NIS[GNSSk] = eskf.NIS_GNSS_position(x_est[k],P_est[k], z_GNSS[k], R_GNSS, lever_arm)  # TODO:
+        x_est[k,:], P_est[k] = eskf.update_GNSS_position(x_pred[k], P_pred[k], z_GNSS[GNSSk], R_GNSS, lever_arm)
+        NIS[GNSSk] = eskf.NIS_GNSS_position(x_est[k],P_est[k], z_GNSS[GNSSk], R_GNSS, lever_arm)  # TODO:
 
         assert np.all(np.isfinite(P_est[k])), f"Not finite P_pred at index {k}"
-
+        
         GNSSk += 1
     else:
         # no updates, so let us take estimate = prediction
@@ -218,11 +217,11 @@ for k in tnrange(N):
     ) = eskf.NEESes(x_est[k,:], P_est[k], x_true[k]) # Done: The true error state at step k
 
     if k < N - 1:
-        x_pred[k + 1,:], P_pred[k + 1] = eskf.predict(x_pred[k], P_pred[k], z_acceleration[k+1], z_gyroscope[k+1], dt)  #Done : Hint: measurements come from the the present and past, not the future
+        x_pred[k + 1,:], P_pred[k + 1] = eskf.predict(x_est[k], P_est[k], z_acceleration[k+1], z_gyroscope[k+1], dt)  #Done : Hint: measurements come from the the present and past, not the future
 
     if eskf.debug:
         assert np.all(np.isfinite(P_pred[k])), f"Not finite P_pred at index {k + 1}"
-
+   
 
 # %% Plots
 
@@ -334,7 +333,7 @@ fig4, axs4 = plt.subplots(2, 1, num=4, clear=True)
 axs4[0].plot(t, np.linalg.norm(delta_x[:N, POS_IDX], axis=1))
 axs4[0].plot(
     np.arange(0, N, 100) * dt,
-    np.linalg.norm(x_true[99:N:100, :3] - z_GNSS[:GNSSk], axis=1),
+    np.linalg.norm(x_true[99:N:100, :3] - z_GNSS[:GNSSk].squeeze(), axis=1),
 )
 axs4[0].set(ylabel="Position error [m]")
 axs4[0].legend(
