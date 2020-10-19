@@ -96,8 +96,10 @@ except Exception as e:
 filename_to_load = "task_simulation.mat"
 loaded_data = scipy.io.loadmat(filename_to_load)
 
-S_a = loaded_data["S_a"]
-S_g = loaded_data["S_g"]
+#S_a = loaded_data["S_a"]
+S_a=np.eye(3)
+#S_g = loaded_data["S_g"]
+S_g = np.eye(3)
 lever_arm = loaded_data["leverarm"].ravel()
 timeGNSS = loaded_data["timeGNSS"].ravel()
 timeIMU = loaded_data["timeIMU"].ravel()
@@ -108,7 +110,7 @@ z_gyroscope = loaded_data["zGyro"].T
 
 
 dt = np.mean(np.diff(timeIMU))
-steps = 1000# len(z_acceleration)
+steps = 90000# len(z_acceleration)
 gnss_steps = len(z_GNSS)
 
 # %% Measurement noise
@@ -135,9 +137,9 @@ cont_acc_bias_driving_noise_std = 6 * acc_bias_driving_noise_std / np.sqrt(1 / d
 p_std = 0.2*np.array([1, 1, 10])  # Measurement noise
 R_GNSS = np.diag(p_std ** 2)
 
-p_acc = 0
+p_acc = 1e-16
 
-p_gyro = 0
+p_gyro = 1e-16
 
 # %% Estimator
 eskf = ESKF(
@@ -430,34 +432,3 @@ plt.grid()
 
 
 # %%
-from zipfile import ZipFile
-import datetime
-figures = [fig1, fig2, fig3, fig4, fig5, fig6]
-zipObj = ZipFile("test.zip", 'w')
-
-
-
-with open("tuning_parameters.txt", "w+") as f:
-
-    f.write(f"Steps:{steps}\n")
-    f.write(f"cont_gyro_noise_std:{cont_gyro_noise_std}\n")
-    f.write(f"cont_acc_noise_std :{cont_acc_noise_std}\n")
-    f.write(f"rate_std: {rate_std}\n")
-    f.write(f"acc_std: {acc_std}\n")
-    f.write(f"rate_bias_driving_noise_std:{rate_bias_driving_noise_std}\n")
-    f.write(f"cont_rate_bias_driving_noise_std:{cont_rate_bias_driving_noise_std}\n")
-    f.write(f"acc_bias_driving_noise_std:{acc_bias_driving_noise_std}\n")
-    f.write(f"cont_acc_bias_driving_noise_std :{cont_acc_bias_driving_noise_std }\n")
-    f.write(f"p_std:{p_std}\n")
-    f.write(f"R_GNSS:{R_GNSS}\n")
-    f.write(f"p_acc:{p_acc}\n")
-    f.write(f"p_gyro:{p_gyro}\n")
-    f.write(f"P_pred[0]:{P_pred[0]}\n")
-    f.write(f"x_pred[0]:{x_pred[0]}\n")
-
-zipObj.write("tuning_parameters.txt")
-for i in range(len(figures)):
-    filename = f"fig{i}.pdf"
-    figures[i].savefig(filename)
-    zipObj.write(filename)
-zipObj.close()

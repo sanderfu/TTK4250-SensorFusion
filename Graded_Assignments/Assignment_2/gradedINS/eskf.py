@@ -124,6 +124,9 @@ class ESKF:
         local_rotation_vector_increment_quaternion=np.concatenate([scalar_part,vector_part])
         #Comment to the above: Was in hint this formula but no idea how to relate it to the book.
         
+        #Normalize
+        local_rotation_vector_increment_quaternion= local_rotation_vector_increment_quaternion/la.norm(local_rotation_vector_increment_quaternion,2)
+        
         quaternion_prediction = quaternion_product(quaternion,local_rotation_vector_increment_quaternion)
 
         # Normalize quaternion
@@ -363,7 +366,6 @@ class ESKF:
 
         Ad, GQGd = self.discrete_error_matrices(x_nominal, acceleration, omega, Ts)
 
-        temp = Ad@P@Ad.T
         #Ordinary KF cov predict (Algorithm 2, Line 4, p. 79)
         P_predicted = Ad@P@Ad.T+GQGd
 
@@ -466,8 +468,6 @@ class ESKF:
         INJ_IDX = POS_IDX + VEL_IDX + ACC_BIAS_IDX + GYRO_BIAS_IDX
         # All error indices, minus the attitude
         DTX_IDX = POS_IDX + VEL_IDX + ERR_ACC_BIAS_IDX + ERR_GYRO_BIAS_IDX
-        # Error indicies for delta_theta
-        DELTA_ATT_IDX = CatSlice(start=6, stop=9)
         
         x_injected = x_nominal.copy()
         # DONE: Inject error state into nominal state (except attitude / quaternion)
@@ -476,13 +476,14 @@ class ESKF:
         # DONE: Inject attitude
         delta_theta = delta_x[ERR_ATT_IDX]
         delta_quat = np.concatenate(([1],1/2*delta_theta))
+        delta_quat = delta_quat/la.norm(delta_quat,2)
         x_injected[ATT_IDX]=quaternion_product(x_injected[ATT_IDX],delta_quat)
         
         # DONE: Normalize quaternion
         x_injected[ATT_IDX]=x_injected[ATT_IDX]/la.norm(x_injected[ATT_IDX],2)
 
         # Covariance
-        # DONE: Compensate for injection in the covariances
+        # DONE: Compensate for injection in the covariances (Eq. 10.86)
         G_injected = la.block_diag(np.eye(6),np.eye(3)-cross_product_matrix(1/2*delta_theta),np.eye(6))
         
         # DONE: Compensate for injection in the covariances
