@@ -108,7 +108,7 @@ z_gyroscope = loaded_data["zGyro"].T
 
 
 dt = np.mean(np.diff(timeIMU))
-steps = 500# len(z_acceleration)
+steps = 10000# len(z_acceleration)
 gnss_steps = len(z_GNSS)
 
 # %% Measurement noise
@@ -179,9 +179,8 @@ x_pred[0, 6] = 1  # no initial rotation: nose to North, right to East, and belly
 P_pred[0][POS_IDX ** 2] = np.eye(3)# TODO
 P_pred[0][VEL_IDX ** 2] = np.eye(3)# TODO
 P_pred[0][ERR_ATT_IDX ** 2] = np.eye(3)# TODO # error rotation vector (not quat)
-P_pred[0][ERR_ACC_BIAS_IDX ** 2] = np.eye(3)# TODO
-P_pred[0][ERR_GYRO_BIAS_IDX ** 2] = np.eye(3)# TODO
-P_pred[0] *= 100
+P_pred[0][ERR_ACC_BIAS_IDX ** 2] = 1e-2*np.eye(3)# TODO
+P_pred[0][ERR_GYRO_BIAS_IDX ** 2] = 1e-6*np.eye(3)# TODO
 
 # %% Test: you can run this cell to test your implementation
 #dummy = eskf.predict(x_pred[0], P_pred[0], z_acceleration[0], z_gyroscope[0], dt)
@@ -189,7 +188,7 @@ P_pred[0] *= 100
 # %% Run estimation
 # run this file with 'python -O run_INS_simulated.py' to turn of assertions and get about 8/5 speed increase for longer runs
 N: int = steps # TODO: choose a small value to begin with (500?), and gradually increase as you OK results
-doGNSS: bool = True  # TODO: Set this to False if you want to check that the predictions make sense over reasonable time lenghts
+doGNSS: bool = True # TODO: Set this to False if you want to check that the predictions make sense over reasonable time lenghts
 
 GNSSk: int = 0  # keep track of current step in GNSS measurements
 for k in tnrange(N):

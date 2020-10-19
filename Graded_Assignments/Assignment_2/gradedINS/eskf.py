@@ -43,8 +43,8 @@ class ESKF:
 
     S_a: np.ndarray = np.eye(3)
     S_g: np.ndarray = np.eye(3)
-    debug: bool = True
-    taylor_matrix_exponential:  bool = False
+    debug: bool = False
+    taylor_matrix_exponential:  bool = True
 
     g: np.ndarray = np.array([0, 0, 9.82])  # Ja, i NED-land, der kan alt gå an
 
@@ -627,7 +627,7 @@ class ESKF:
         Jo = I - W @ H
         
         # DONE: P update (Jospehs form Eq. 4.10)
-        P_update = Jo@P@Jo.T+W@R@W.T
+        P_update = Jo@P@Jo.T+W@R_GNSS@W.T
 
         # error state injection
         x_injected, P_injected = self.inject(x_nominal, delta_x, P_update)
