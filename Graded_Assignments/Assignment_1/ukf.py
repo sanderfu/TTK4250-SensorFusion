@@ -59,36 +59,12 @@ class UKF:
         self._MLOG2PIby2: Final[float] = self.sensor_model.m * \
             np.log(2 * np.pi) / 2
 
-    def __get_sigmas(self, mean, cov):
-        ret = np.zeros((self.n_sig, self.n_dim))
-        tmp_mat = (self.n_dim + self.lambd)*cov
-        spr_mat = scipy.linalg.sqrtm(tmp_mat)
-        
-        ret[0] = mean
-
-        import ipdb
-
-        ipdb.set_trace()
-        for i in range(self.n_dim//2):
-            ret[i+1] = mean + spr_mat[i]
-            ret[i+1+self.n_dim] = mean-spr_mat[i]
-
-        return ret
-
-    def predict(self,
-                ukfstate: GaussParams,
-                # The sampling time in units specified by dynamic_model
-                Ts: float,
-                ) -> GaussParams:
-        """Predict the EKF state Ts seconds ahead."""
-        x, P = ukfstate  # tuple unpacking
-
-        self.n_dim = len(x)
+        self.n_dim = self.dynamic_model.n
         self.n_sig = 1 + self.n_dim*2
         
-        self.beta = 2
-        self.alpha = 1
-        self.k = 2
+        self.beta = float(2)
+        self.alpha = float(1)
+        self.k = float(3-self.n_dim)
         self.lambd = math.pow(self.alpha, 2)*(self.n_dim+self.k) - self.n_dim
         self.covar_weights = np.zeros(self.n_sig)
         self.mean_weights = np.zeros(self.n_sig)
@@ -100,20 +76,43 @@ class UKF:
             self.covar_weights[i] = 1.0 / (2.0*(self.n_dim + self.lambd))
             self.mean_weights[i] = 1.0 / (2.0*(self.n_dim + self.lambd))
 
+    def __get_sigmas(self, mean, cov):
+        ret = np.zeros((self.n_sig, self.n_dim))
+        tmp_mat = (self.n_dim + self.lambd)*cov
+        spr_mat = scipy.linalg.sqrtm(tmp_mat)
         
+        ret[0] = mean
+
+        import ipdb
+
+        for i in range(1, self.n_sig//2+1):
+            ret[i] = mean + spr_mat[i-1]
+            ret[i+self.n_dim] = mean-spr_mat[i-1]
+
+        ipdb.set_trace()
+        return ret
+
+    def predict(self,
+                ukfstate: GaussParams,
+                # The sampling time in units specified by dynamic_model
+                Ts: float,
+                ) -> GaussParams:
+        """Predict the EKF state Ts seconds ahead."""
+        x, P = ukfstate  # tuple unpacking
+
 
         sigmas = self.__get_sigmas(x, P)
         sigmas_out = np.array([self.dynamic_model.f(sig,Ts) for sig in sigmas])
 
-
         x_pred = np.zeros(self.n_dim)
         P_pred = np.zeros((self.n_dim, self.n_dim))
+        
         for i in range(self.n_sig):
             x_pred += self.mean_weights[i]*sigmas_out[i]
 
         for i in range(self.n_sig):
             diff = sigmas_out[i]-x_pred
-            P_pred += self.covar_weights[i]*np.dot(diff.T, diff)
+            P_pred += self.covar_weights[i]*np.dot(diff, diff.T)
 
         Q = self.dynamic_model.Q(x, Ts)
         import ipdb
@@ -123,71 +122,19 @@ class UKF:
         return GaussParams(x_pred, P_pred)
 
 
-    def innovation_mean(
-            self,
-            z: np.ndarray,
-            ukfstate: GaussParams,
-            *,
-            sensor_state: Dict[str, Any] = None,
-    ) -> np.ndarray:
-        """Calculate the innovation mean for ukfstate at z in sensor_state."""
-
-        x = ukfstate.mean
-
-        #Predicted measurement (Algorithm 1 p.54)
-        zbar = self.sensor_model.h(x)
-        
-        #Innovation (Algorithm 1 p.54)
-        v = z-zbar
-
-        return v
-
-    def innovation_cov(self,
-                       z: np.ndarray,
-                       ukfstate: GaussParams,
-                       *,
-                       sensor_state: Dict[str, Any] = None,
-                       ) -> np.ndarray:
-        """Calculate the innovation covariance for ukfstate at z in sensorstate."""
-
-        #Tuple unpacking
-        x, P = ukfstate
-        
-        
-        H = self.sensor_model.H(x, sensor_state=sensor_state)
-        R = self.sensor_model.R(x, sensor_state=sensor_state, z=z)
-        
-        #Innovation covariance (Algorithm 1, p.54)
-        S = H@P@H.T+R
-
-        return S
-
-    def innovation(self,
-                   z: np.ndarray,
-                   ukfstate: GaussParams,
-                   *,
-                   sensor_state: Dict[str, Any] = None,
-                   ) -> GaussParams:
-        """Calculate the innovation for ukfstate at z in sensor_state."""
-
-        v = self.innovation_mean(z,ukfstate)
-        S = self.innovation_cov(z,ukfstate)
-
-        innovationstate = GaussParams(v, S)
-
-        return innovationstate
 
     def update(
         self, z: np.ndarray, ukfstate: GaussParams, sensor_state: Dict[str, Any] = None
     ) -> GaussParams:
         """Update ukfstate with z in sensor_state"""
 
+        import ipdb
         x, P = ukfstate
+        ipdb.set_trace()
         m = self.sensor_model.m
         sigmas = self.__get_sigmas(x, P)
         sigmas_out = np.array([self.sensor_model.h(sig) for sig in sigmas])
 
-        import ipdb
         z_upd = np.zeros(m)
         S_upd = np.zeros((m, m))
         for i in range(self.n_sig):
@@ -206,13 +153,14 @@ class UKF:
             Sigma_upd += self.covar_weights[i]*np.outer(left_diff, right_diff)
 
         kalman_gain = Sigma_upd@np.linalg.inv(S_upd)
-        assert(kalman_gain.shape == (5, 2)), "Wrong shape for kalman gain"
+        assert(kalman_gain.shape == (self.n_dim, m)), "Wrong shape for kalman gain"
 
         x_upd = x + kalman_gain@(z-z_upd)
         P_upd = P - kalman_gain@S_upd@kalman_gain.T
 
         ukfstate_upd = GaussParams(x_upd, P_upd)
 
+        ipdb.set_trace()
         return ukfstate_upd
 
     def step(self,
@@ -230,37 +178,8 @@ class UKF:
         
         return ukfstate_upd
 
-    def NIS(self,
-            z: np.ndarray,
-            ukfstate: GaussParams,
-            *,
-            sensor_state: Dict[str, Any] = None,
-            ) -> float:
-        """Calculate the normalized innovation squared for ukfstate at z in sensor_state"""
-
-        v, S = self.innovation(z, ukfstate, sensor_state=sensor_state)
-
-        #Equation 4.66 p.67
-        NIS = v.T@la.solve(S,v)
-
-        return NIS
 
     @classmethod
-    def NEES(cls,
-             ukfstate: GaussParams,
-             # The true state to comapare against
-             x_true: np.ndarray,
-             ) -> float:
-        """Calculate the normalized etimation error squared from ukfstate to x_true."""
-
-        x, P = ukfstate
-
-        x_diff = x-x_true
-        
-        #Equation 4.65 p. 67
-        NEES = x_diff.T@la.inv(P)@x_diff
-        
-        return NEES
 
     def gate(self,
              z: np.ndarray,
@@ -273,7 +192,9 @@ class UKF:
         ukfstate in sensor_state """
 
         #Equation unnumbered, page 116.
-        gated = self.NIS(z,ukfstate,sensor_state=sensor_state)<gate_size_square
+        x, P = ukfstate
+        innov = z-self.sensor_model.h(x)
+        gated = innov@P@innov.T<gate_size_square
         return gated
 
     def loglikelihood(
