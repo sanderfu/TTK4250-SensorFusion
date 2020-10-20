@@ -435,7 +435,7 @@ import datetime
 import re
 import os
 the_time = str(datetime.datetime.now())
-the_time = re.sub(r':',r'|', the_time)
+the_time = re.sub(r':',r';', the_time)
 the_time = re.sub(r' ',r'_', the_time)
 print(the_time)
 zipObj = ZipFile(f"test_{the_time}.zip", 'w')
