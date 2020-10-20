@@ -428,12 +428,17 @@ axs6[2].boxplot([NEES_pos[0:N].T, NEES_vel[0:N].T, NEES_att[0:N].T, NEES_accbias
 axs6[2].legend(['NEES pos', 'NEES vel', 'NEES att', 'NEES accbias', 'NEES gyrobias', 'gauss (3 dim)'])
 plt.grid()
 
-
+plt.show()
 # %%
 from zipfile import ZipFile
 import datetime
-figures = [fig1, fig2, fig3, fig4, fig5, fig6]
-zipObj = ZipFile("test.zip", 'w')
+import re
+import os
+the_time = str(datetime.datetime.now())
+the_time = re.sub(r':',r'|', the_time)
+the_time = re.sub(r' ',r'_', the_time)
+print(the_time)
+zipObj = ZipFile(f"test_{the_time}.zip", 'w')
 
 
 
@@ -456,8 +461,11 @@ with open("tuning_parameters.txt", "w+") as f:
     f.write(f"x_pred[0]:{x_pred[0]}\n")
 
 zipObj.write("tuning_parameters.txt")
-for i in range(len(figures)):
-    filename = f"fig{i}.pdf"
-    figures[i].savefig(filename)
+zipObj.write("run_INS_simulated.py")
+for i in plt.get_fignums():
+    filename = f"fig{i}{the_time}.pdf"
+    plt.figure(i)
+    plt.savefig(filename)
     zipObj.write(filename)
+    os.remove(filename)
 zipObj.close()

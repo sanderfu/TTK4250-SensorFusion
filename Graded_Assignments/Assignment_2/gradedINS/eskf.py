@@ -599,11 +599,8 @@ class ESKF:
             3,
         ), f"ESKF.update_GNSS: lever_arm shape incorrect {lever_arm.shape}"
 
-        I = np.eye(*P.shape)
+         
 
-        #innovation, S = self.innovation_GNSS_position(
-        #    x_nominal, P, z_GNSS_position, R_GNSS, lever_arm
-        #)
         v = z_GNSS_position-x_nominal[POS_IDX]
         #Measurement matrix
         H = np.concatenate((np.eye(3),np.zeros((3,12))),axis=1)
@@ -625,7 +622,7 @@ class ESKF:
         delta_x = W@v
         
         # for Joseph form
-        Jo = I - W @ H
+        Jo = np.eye(*P.shape) - W @ H
         
         # DONE: P update (Jospehs form Eq. 4.10)
         P_update = Jo@P@Jo.T+W@R_GNSS@W.T

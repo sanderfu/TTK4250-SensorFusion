@@ -110,7 +110,7 @@ accuracy_GNSS = loaded_data['GNSSaccuracy'].ravel()
 
 dt = np.mean(np.diff(timeIMU))
 steps = len(z_acceleration)
-steps = 500000
+steps = 5000
 gnss_steps = len(z_GNSS)
 
 # %% Measurement noise
@@ -273,3 +273,4 @@ plt.legend(['NIS', 'gauss'])
 plt.grid()
 
 # %%
+plt.show()
