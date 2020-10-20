@@ -6,6 +6,7 @@ import scipy.stats
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+import scipy.linalg as la
 
 try: # see if tqdm is available, otherwise define it as a dummy
     try: # Ipython seem to require different tqdm.. try..except seem to be the easiest way to check
@@ -110,7 +111,7 @@ accuracy_GNSS = loaded_data['GNSSaccuracy'].ravel()
 
 dt = np.mean(np.diff(timeIMU))
 steps = len(z_acceleration)
-steps = 54000
+steps = 55000
 gnss_steps = len(z_GNSS)
 
 # %% Measurement noise
@@ -188,8 +189,23 @@ doGNSS: bool = True # TODO: Set this to False if you want to check that the pred
 
 GNSSk: int = 0  # keep track of current step in GNSS measurements
 
+stationary = True
+diff_to_change=1
+
+
 for k in tqdm(range(N)):
+    
+    
     if doGNSS and timeIMU[k] >= timeGNSS[GNSSk]:
+        
+        # if stationary:
+        #     if GNSSk>0 and abs(la.norm(z_GNSS[GNSSk])-la.norm(z_GNSS[GNSSk-1])>diff_to_change):
+        #         stationary=False
+        #         print("Leaving stationary state, starting ESKF, k=",k)
+        #     else:
+        #         print("Staying in stationary state, k=",k)
+        #         GNSSk += 1
+        #         continue
 
         x_est[k,:], P_est[k] = eskf.update_GNSS_position(x_pred[k], P_pred[k], z_GNSS[GNSSk], RGNSS(GNSSk), lever_arm)
         NIS[GNSSk] = eskf.NIS_GNSS_position(x_est[k],P_est[k], z_GNSS[GNSSk], RGNSS(GNSSk), lever_arm)
@@ -204,7 +220,7 @@ for k in tqdm(range(N)):
         P_est[k] = P_pred[k]
 
     if k < N - 1:
-        x_pred[k + 1,:], P_pred[k + 1] = eskf.predict(x_est[k], P_est[k], z_acceleration[k], z_gyroscope[k], dt)  #Done : Hint: measurements come from the the present and past, not the future
+        x_pred[k + 1,:], P_pred[k + 1] = eskf.predict(x_est[k], P_est[k], z_acceleration[k+1], z_gyroscope[k+1], dt)  #Done : Hint: measurements come from the the present and past, not the future
 
     if eskf.debug:
         assert np.all(np.isfinite(P_pred[k])), f"Not finite P_pred at index {k + 1}"
