@@ -282,7 +282,7 @@ the_time = str(datetime.datetime.now())
 the_time = re.sub(r':',r';', the_time)
 the_time = re.sub(r' ',r'_', the_time)
 print(the_time)
-zipObj = ZipFile(f"test_{the_time}.zip", 'w')
+zipObj = ZipFile(f"test_real{the_time}.zip", 'w')
 
 
 
@@ -305,7 +305,7 @@ zipObj = ZipFile(f"test_{the_time}.zip", 'w')
 #     f.write(f"x_pred[0]:{x_pred[0]}\n")
 
 # zipObj.write("tuning_parameters.txt")
-zipObj.write("run_INS_simulated.py")
+zipObj.write("run_INS_real.py")
 for i in plt.get_fignums():
     filename = f"fig_real{i}{the_time}.pdf"
     plt.figure(i)
