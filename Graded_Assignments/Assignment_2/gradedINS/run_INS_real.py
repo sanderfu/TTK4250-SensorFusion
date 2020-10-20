@@ -111,7 +111,7 @@ accuracy_GNSS = loaded_data['GNSSaccuracy'].ravel()
 
 dt = np.mean(np.diff(timeIMU))
 steps = len(z_acceleration)
-steps = 55000
+steps = 75000
 gnss_steps = len(z_GNSS)
 
 # %% Measurement noise
@@ -191,6 +191,8 @@ GNSSk: int = 0  # keep track of current step in GNSS measurements
 
 stationary = True
 diff_to_change=1
+GNSSk_start_moving = 0
+k_start_moving = 0
 
 
 for k in tqdm(range(N)):
@@ -201,12 +203,18 @@ for k in tqdm(range(N)):
         # if stationary:
         #     if GNSSk>0 and abs(la.norm(z_GNSS[GNSSk])-la.norm(z_GNSS[GNSSk-1])>diff_to_change):
         #         stationary=False
-        #         print("Leaving stationary state, starting ESKF, k=",k)
+        #         x_pred[k,POS_IDX]=z_GNSS[GNSSk]
+        #         P_pred[k][POS_IDX**2]=RGNSS(GNSSk)
+        #         GNSSk_start_moving = GNSSk
+        #         k_start_moving = k
+        #         print(x_pred[k])
+        #         print("Leaving stationary state, starting ESKF, k=",k," GNSSk=",GNSSk)
         #     else:
+        #         x_pred[k+1]=x_pred[k]
+        #         P_pred[k+1]=P_pred[k]
         #         print("Staying in stationary state, k=",k)
         #         GNSSk += 1
         #         continue
-
         x_est[k,:], P_est[k] = eskf.update_GNSS_position(x_pred[k], P_pred[k], z_GNSS[GNSSk], RGNSS(GNSSk), lever_arm)
         NIS[GNSSk] = eskf.NIS_GNSS_position(x_est[k],P_est[k], z_GNSS[GNSSk], RGNSS(GNSSk), lever_arm)
         
@@ -215,6 +223,11 @@ for k in tqdm(range(N)):
         
         GNSSk += 1
     else:
+        
+        # if stationary:
+        #     x_pred[k+1]=x_pred[k]
+        #     P_pred[k+1]=P_pred[k]
+        #     continue
         # no updates, so let us take estimate = prediction
         x_est[k,:] = x_pred[k,:] #Done
         P_est[k] = P_pred[k]
@@ -231,8 +244,8 @@ for k in tqdm(range(N)):
 fig1 = plt.figure(1)
 ax = plt.axes(projection='3d')
 
-ax.plot3D(x_est[0:N, 1], x_est[0:N, 0], -x_est[0:N, 2])
-ax.plot3D(z_GNSS[0:GNSSk, 1], z_GNSS[0:GNSSk, 0], -z_GNSS[0:GNSSk, 2])
+ax.plot3D(x_est[k_start_moving:N, 1], x_est[k_start_moving:N, 0], -x_est[k_start_moving:N, 2])
+ax.plot3D(z_GNSS[GNSSk_start_moving:GNSSk, 1], z_GNSS[GNSSk_start_moving:GNSSk, 0], -z_GNSS[GNSSk_start_moving:GNSSk, 2])
 ax.set_xlabel('East [m]')
 ax.set_xlabel('North [m]')
 ax.set_xlabel('Altitude [m]')
