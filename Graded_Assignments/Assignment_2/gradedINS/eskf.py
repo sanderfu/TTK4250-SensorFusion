@@ -601,10 +601,10 @@ class ESKF:
 
         I = np.eye(*P.shape)
 
-        innovation, S = self.innovation_GNSS_position(
-            x_nominal, P, z_GNSS_position, R_GNSS, lever_arm
-        )
-
+        #innovation, S = self.innovation_GNSS_position(
+        #    x_nominal, P, z_GNSS_position, R_GNSS, lever_arm
+        #)
+        v = z_GNSS_position-x_nominal[POS_IDX]
         #Measurement matrix
         H = np.concatenate((np.eye(3),np.zeros((3,12))),axis=1)
 
@@ -612,7 +612,7 @@ class ESKF:
         if not np.allclose(lever_arm, 0):
             R = quaternion_to_rotation_matrix(x_nominal[ATT_IDX], debug=self.debug)
             H[:, ERR_ATT_IDX] = -R @ cross_product_matrix(lever_arm, debug=self.debug)
-
+            v -= R @ lever_arm
         # Comment: Because measurement only of position, we don't have to think
         # about X_{deltax} as that only applies to the attitude
         # For further detail see notice in BB-session 9c (Sanders notes)
@@ -622,7 +622,7 @@ class ESKF:
         W = P@H.T@la.inv(H@P@H.T+R_GNSS)
         
         # DONE: delta x
-        delta_x = W@innovation
+        delta_x = W@v
         
         # for Joseph form
         Jo = I - W @ H

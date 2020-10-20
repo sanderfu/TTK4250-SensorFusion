@@ -35,4 +35,4 @@ def test_cross_product_matrix():
     assert((cross_prod == np.cross(vec, vec2)).all()), "Cross product not the same."
     print("Test passed, cross product matrix works")
 
-test_cross_product_matrix()
+#test_cross_product_matrix()
