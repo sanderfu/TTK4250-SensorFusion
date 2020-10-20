@@ -110,7 +110,7 @@ accuracy_GNSS = loaded_data['GNSSaccuracy'].ravel()
 
 dt = np.mean(np.diff(timeIMU))
 steps = len(z_acceleration)
-steps = 5000
+steps = 54000
 gnss_steps = len(z_GNSS)
 
 # %% Measurement noise
@@ -119,19 +119,23 @@ cont_gyro_noise_std = 2.5e-3  # (rad/s)/sqrt(Hz)
 cont_acc_noise_std = 1.167e-3  # (m/s**2)/sqrt(Hz)
 
 # Discrete sample noise at simulation rate used
-rate_std = 1e-5
-acc_std  = 1e-4
+rate_std = cont_gyro_noise_std * np.sqrt(1 / dt)
+acc_std = cont_acc_noise_std * np.sqrt(1 / dt)
 
 # Bias values
-rate_bias_driving_noise_std = 5e-5
-cont_rate_bias_driving_noise_std = (2.2e-3)**2
+#rate_bias_driving_noise_std = 5e-5
+cont_rate_bias_driving_noise_std = 2.2e-3
 
-acc_bias_driving_noise_std = 4e-3
-cont_acc_bias_driving_noise_std = (1.2e-5)**2
+#acc_bias_driving_noise_std = 4e-3
+cont_acc_bias_driving_noise_std = 1.2e-5
 
 # Position and velocity measurement
 p_std = np.array([(np.mean(accuracy_GNSS))]*3)  # Measurement noise
-R_GNSS = np.diag(p_std ** 2)
+#R_GNSS = np.diag(p_std ** 2)
+
+def RGNSS(GNSSk):
+    return np.diag(((0.3**2)*accuracy_GNSS[GNSSk]**2)*np.array([0.9**2,0.9**2, 1.6**2]))
+    
 
 # Position and velocity measurement
 p_acc = 1e-3
@@ -170,11 +174,11 @@ x_pred[0, ATT_IDX] = np.array([
     np.sin(45 * np.pi / 180)
 ])  # nose to east, right to south and belly down.
 
-P_pred[0][POS_IDX**2] = 10**2 * np.eye(3)
-P_pred[0][VEL_IDX**2] = 3**2 * np.eye(3)
-P_pred[0][ERR_ATT_IDX**2] = (np.pi/30)**2 * np.eye(3) # error rotation vector (not quat)
-P_pred[0][ERR_ACC_BIAS_IDX**2] = 0.05**2 * np.eye(3)
-P_pred[0][ERR_GYRO_BIAS_IDX**2] = (1e-3)**2 * np.eye(3)
+P_pred[0][POS_IDX**2] = (2e-1)**2*np.eye(3)
+P_pred[0][VEL_IDX**2] = (3e-4)**2*np.eye(3)
+P_pred[0][ERR_ATT_IDX**2] = (1e-1*(np.pi/30))**2 * np.eye(3) # error rotation vector (not quat)
+P_pred[0][ERR_ACC_BIAS_IDX**2] = 0.02**2 *np.eye(3)
+P_pred[0][ERR_GYRO_BIAS_IDX**2] = (1e-4)**2 * np.eye(3)
 
 # %% Run estimation
 
@@ -187,8 +191,8 @@ GNSSk: int = 0  # keep track of current step in GNSS measurements
 for k in tqdm(range(N)):
     if doGNSS and timeIMU[k] >= timeGNSS[GNSSk]:
 
-        x_est[k,:], P_est[k] = eskf.update_GNSS_position(x_pred[k], P_pred[k], z_GNSS[GNSSk], R_GNSS, lever_arm)
-        NIS[GNSSk] = eskf.NIS_GNSS_position(x_est[k],P_est[k], z_GNSS[GNSSk], R_GNSS, lever_arm)
+        x_est[k,:], P_est[k] = eskf.update_GNSS_position(x_pred[k], P_pred[k], z_GNSS[GNSSk], RGNSS(GNSSk), lever_arm)
+        NIS[GNSSk] = eskf.NIS_GNSS_position(x_est[k],P_est[k], z_GNSS[GNSSk], RGNSS(GNSSk), lever_arm)
         
         if eskf.debug:
             assert np.all(np.isfinite(P_est[k])), f"Not finite P_pred at index {k}"
@@ -271,6 +275,8 @@ gauss_compare = np.sum(np.random.randn(3, GNSSk)**2, axis=0)
 plt.boxplot([NIS[0:GNSSk], gauss_compare], notch=True)
 plt.legend(['NIS', 'gauss'])
 plt.grid()
+
+plt.show()
 
 # %%
 plt.show()
