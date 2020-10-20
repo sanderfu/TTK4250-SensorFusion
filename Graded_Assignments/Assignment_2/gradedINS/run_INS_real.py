@@ -135,7 +135,7 @@ p_std = np.array([(np.mean(accuracy_GNSS))]*3)  # Measurement noise
 #R_GNSS = np.diag(p_std ** 2)
 
 def RGNSS(GNSSk):
-    return np.diag(((0.3**2)*accuracy_GNSS[GNSSk]**2)*np.array([0.9**2,0.9**2, 1.6**2]))
+    return np.diag(((0.3**2)*accuracy_GNSS[GNSSk]**2)*np.array([0.9**2,0.9**2, 5**2]))
     
 
 # Position and velocity measurement
@@ -165,6 +165,8 @@ x_pred = np.zeros((steps, 16))
 P_pred = np.zeros((steps, 15, 15))
 
 NIS = np.zeros(gnss_steps)
+NIS_planar = np.zeros(gnss_steps)
+NIS_altitude = np.zeros(gnss_steps)
 
 # %% Initialise
 x_pred[0, POS_IDX] = np.array([0, 0, 0]) # starting 5 metres above ground
@@ -194,6 +196,20 @@ diff_to_change=1
 GNSSk_start_moving = 0
 k_start_moving = 0
 
+import logging
+import threading
+import time
+
+
+format = "%(asctime)s: %(message)s"
+logging.basicConfig(format=format, level=logging.INFO, datefmt="%H:%M:%S")
+
+nis_threads = []
+def nis_calculations(x, P, z, GNSSk):
+    R = RGNSS(GNSSk)
+    NIS[GNSSk] = eskf.NIS_GNSS_position(x, P, z, R, lever_arm)
+    NIS_planar[GNSSk] = eskf.NIS_Planar(x, P, z, R, lever_arm)
+    NIS_altitude[GNSSk] = eskf.NIS_Altitude(x, P, z, R, lever_arm)
 
 for k in tqdm(range(N)):
     
@@ -216,8 +232,11 @@ for k in tqdm(range(N)):
         #         GNSSk += 1
         #         continue
         x_est[k,:], P_est[k] = eskf.update_GNSS_position(x_pred[k], P_pred[k], z_GNSS[GNSSk], RGNSS(GNSSk), lever_arm)
-        NIS[GNSSk] = eskf.NIS_GNSS_position(x_est[k],P_est[k], z_GNSS[GNSSk], RGNSS(GNSSk), lever_arm)
+        nis_thread = threading.Thread(target=nis_calculations, args=(x_est[k],P_est[k], z_GNSS[GNSSk], GNSSk))
+        nis_thread.start()
+        nis_threads.append(nis_thread)
         
+
         if eskf.debug:
             assert np.all(np.isfinite(P_est[k])), f"Not finite P_pred at index {k}"
         
@@ -237,10 +256,11 @@ for k in tqdm(range(N)):
 
     if eskf.debug:
         assert np.all(np.isfinite(P_pred[k])), f"Not finite P_pred at index {k + 1}"
-   
+ 
 
 # %% Plots
-
+for thr in nis_threads:
+    thr.join()
 fig1 = plt.figure(1)
 ax = plt.axes(projection='3d')
 
@@ -289,11 +309,14 @@ fig2.suptitle('States estimates')
 confprob = 0.95
 CI3 = np.array(scipy.stats.chi2.interval(confprob, 3)).reshape((2, 1))
 
-fig3 = plt.figure()
+fig3, ax = plt.subplots()
 
-plt.plot(NIS[:GNSSk])
-plt.plot(np.array([0, N-1]) * dt, (CI3@np.ones((1, 2))).T)
+ax.plot(NIS[:GNSSk], label='NIS')
+ax.plot(NIS_planar[:GNSSk], label='NIS_Planar')
+ax.plot(NIS_altitude[:GNSSk], label='NIS_Altitude')
+ax.plot(np.array([0, N-1]) * dt, (CI3@np.ones((1, 2))).T)
 insideCI = np.mean((CI3[0] <= NIS) * (NIS <= CI3[1]))
+ax.legend()
 plt.title(f'NIS ({100 *  insideCI:.1f} inside {100 * confprob} confidence interval)')
 plt.grid()
 

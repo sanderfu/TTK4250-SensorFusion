@@ -690,7 +690,107 @@ class ESKF:
         assert NIS >= 0, "EKSF.NIS_GNSS_positionNIS: NIS not positive"
 
         return NIS
+    def NIS_Planar(
+        self,
+        x_nominal: np.ndarray,
+        P: np.ndarray,
+        z_GNSS_position: np.ndarray,
+        R_GNSS: np.ndarray,
+        lever_arm: np.ndarray = np.zeros(3),
+    ) -> float:
+        """Calculates the NIS for a GNSS position measurement
 
+        Args:
+            x_nominal (np.ndarray): The nominal state to calculate the innovation from, shape (16,)
+            P (np.ndarray): The error state covariance to calculate the innovation covariance from, shape (15, 15)
+            z_GNSS_position (np.ndarray): The measured 3D position, shape (3,)
+            R_GNSS (np.ndarray): The estimated covariance matrix of the measurement, shape (3,)
+            lever_arm (np.ndarray, optional): The position of the GNSS receiver from the IMU reference, shape (3,). Defaults to np.zeros(3).
+
+        Raises:
+            AssertionError: If any input is of the wrong shape, and if debug mode is on, certain numeric properties
+
+        Returns:
+            float: The normalized innovations squared (NIS)
+        """
+
+        assert x_nominal.shape == (
+            16,
+        ), "ESKF.NIS_GNSS: x_nominal shape incorrect " + str(x_nominal.shape)
+        assert P.shape == (15, 15), "ESKF.NIS_GNSS: P shape incorrect " + str(P.shape)
+        assert z_GNSS_position.shape == (
+            3,
+        ), "ESKF.NIS_GNSS: z_GNSS_position shape incorrect " + str(
+            z_GNSS_position.shape
+        )
+        assert R_GNSS.shape == (3, 3), "ESKF.NIS_GNSS: R_GNSS shape incorrect " + str(
+            R_GNSS.shape
+        )
+        assert lever_arm.shape == (
+            3,
+        ), "ESKF.NIS_GNSS: lever_arm shape incorrect " + str(lever_arm.shape)
+
+        v, S = self.innovation_GNSS_position(
+            x_nominal, P, z_GNSS_position, R_GNSS, lever_arm
+        )
+
+        #Eq. 4.66
+        NIS = v[:1].T@la.solve(S[:1,:1],v[:1])
+
+        assert NIS >= 0, "EKSF.NIS_GNSS_positionNIS: NIS not positive"
+
+        return NIS
+    
+    def NIS_Altitude(
+        self,
+        x_nominal: np.ndarray,
+        P: np.ndarray,
+        z_GNSS_position: np.ndarray,
+        R_GNSS: np.ndarray,
+        lever_arm: np.ndarray = np.zeros(3),
+    ) -> float:
+        """Calculates the NIS for a GNSS position measurement
+
+        Args:
+            x_nominal (np.ndarray): The nominal state to calculate the innovation from, shape (16,)
+            P (np.ndarray): The error state covariance to calculate the innovation covariance from, shape (15, 15)
+            z_GNSS_position (np.ndarray): The measured 3D position, shape (3,)
+            R_GNSS (np.ndarray): The estimated covariance matrix of the measurement, shape (3,)
+            lever_arm (np.ndarray, optional): The position of the GNSS receiver from the IMU reference, shape (3,). Defaults to np.zeros(3).
+
+        Raises:
+            AssertionError: If any input is of the wrong shape, and if debug mode is on, certain numeric properties
+
+        Returns:
+            float: The normalized innovations squared (NIS)
+        """
+
+        assert x_nominal.shape == (
+            16,
+        ), "ESKF.NIS_GNSS: x_nominal shape incorrect " + str(x_nominal.shape)
+        assert P.shape == (15, 15), "ESKF.NIS_GNSS: P shape incorrect " + str(P.shape)
+        assert z_GNSS_position.shape == (
+            3,
+        ), "ESKF.NIS_GNSS: z_GNSS_position shape incorrect " + str(
+            z_GNSS_position.shape
+        )
+        assert R_GNSS.shape == (3, 3), "ESKF.NIS_GNSS: R_GNSS shape incorrect " + str(
+            R_GNSS.shape
+        )
+        assert lever_arm.shape == (
+            3,
+        ), "ESKF.NIS_GNSS: lever_arm shape incorrect " + str(lever_arm.shape)
+
+        v, S = self.innovation_GNSS_position(
+            x_nominal, P, z_GNSS_position, R_GNSS, lever_arm
+        )
+        
+        #Eq. 4.66
+        NIS = v[2]/S[2,2]*v[2]
+
+        assert NIS >= 0, "EKSF.NIS_GNSS_positionNIS: NIS not positive"
+
+        return NIS    
     @classmethod
     def delta_x(cls, x_nominal: np.ndarray, x_true: np.ndarray,) -> np.ndarray:
         """Calculates the error state between x_nominal and x_true
