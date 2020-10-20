@@ -442,28 +442,28 @@ zipObj = ZipFile(f"test_{the_time}.zip", 'w')
 
 
 
-with open("tuning_parameters.txt", "w+") as f:
+# with open("tuning_parameters.txt", "w+") as f:
 
-    f.write(f"Steps:{steps}\n")
-    f.write(f"cont_gyro_noise_std:{cont_gyro_noise_std}\n")
-    f.write(f"cont_acc_noise_std :{cont_acc_noise_std}\n")
-    f.write(f"rate_std: {rate_std}\n")
-    f.write(f"acc_std: {acc_std}\n")
-    f.write(f"rate_bias_driving_noise_std:{rate_bias_driving_noise_std}\n")
-    f.write(f"cont_rate_bias_driving_noise_std:{cont_rate_bias_driving_noise_std}\n")
-    f.write(f"acc_bias_driving_noise_std:{acc_bias_driving_noise_std}\n")
-    f.write(f"cont_acc_bias_driving_noise_std :{cont_acc_bias_driving_noise_std }\n")
-    f.write(f"p_std:{p_std}\n")
-    f.write(f"R_GNSS:{R_GNSS}\n")
-    f.write(f"p_acc:{p_acc}\n")
-    f.write(f"p_gyro:{p_gyro}\n")
-    f.write(f"P_pred[0]:{P_pred[0]}\n")
-    f.write(f"x_pred[0]:{x_pred[0]}\n")
+#     f.write(f"Steps:{steps}\n")
+#     f.write(f"cont_gyro_noise_std:{cont_gyro_noise_std}\n")
+#     f.write(f"cont_acc_noise_std :{cont_acc_noise_std}\n")
+#     f.write(f"rate_std: {rate_std}\n")
+#     f.write(f"acc_std: {acc_std}\n")
+#     f.write(f"rate_bias_driving_noise_std:{rate_bias_driving_noise_std}\n")
+#     f.write(f"cont_rate_bias_driving_noise_std:{cont_rate_bias_driving_noise_std}\n")
+#     f.write(f"acc_bias_driving_noise_std:{acc_bias_driving_noise_std}\n")
+#     f.write(f"cont_acc_bias_driving_noise_std :{cont_acc_bias_driving_noise_std }\n")
+#     f.write(f"p_std:{p_std}\n")
+#     f.write(f"R_GNSS:{R_GNSS}\n")
+#     f.write(f"p_acc:{p_acc}\n")
+#     f.write(f"p_gyro:{p_gyro}\n")
+#     f.write(f"P_pred[0]:{P_pred[0]}\n")
+#     f.write(f"x_pred[0]:{x_pred[0]}\n")
 
-zipObj.write("tuning_parameters.txt")
+# zipObj.write("tuning_parameters.txt")
 zipObj.write("run_INS_simulated.py")
 for i in plt.get_fignums():
-    filename = f"fig{i}{the_time}.pdf"
+    filename = f"fig_sim{i}{the_time}.pdf"
     plt.figure(i)
     plt.savefig(filename)
     zipObj.write(filename)
