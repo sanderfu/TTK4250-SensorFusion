@@ -107,7 +107,7 @@ for Zk, xgtk in zip(Z, Xgt):
 ax1.scatter(*Z_plot_data.T, s=5, color="C1")
 ax1.plot(*Xgt.T[:2], color="C0", linewidth=1.5)
 ax1.set_title("True trajectory and the nearby measurements")
-plt.show(block=False)
+#plt.show(block=False)
 
 # %% play measurement movie. Remember that you can cross out the window
 play_movie = False
@@ -161,8 +161,8 @@ assert np.allclose(np.sum(PI, axis=1), 1), "rows of PI must sum to 1"
 
 mean_init = np.array([0,0, 0, 0, 0])
 cov_init = np.zeros((5, 5))
-cov_init[[0, 1], [0, 1]] = 25 ** 2
-cov_init[[2, 3], [2, 3]] = 3 ** 2
+cov_init[[0, 1], [0, 1]] = 1 ** 2
+cov_init[[2, 3], [2, 3]] = 1 ** 2
 cov_init[4,4] = 0.1
 
 mode_probabilities_init = np.array([p10, (1 - p10)])

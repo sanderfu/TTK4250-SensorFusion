@@ -67,8 +67,8 @@ class UKF:
         ret[0] = mean
 
         import ipdb
-        ipdb.set_trace()
 
+        ipdb.set_trace()
         for i in range(self.n_dim//2):
             ret[i+1] = mean + spr_mat[i]
             ret[i+1+self.n_dim] = mean-spr_mat[i]
@@ -87,7 +87,7 @@ class UKF:
         self.n_sig = 1 + self.n_dim*2
         
         self.beta = 2
-        self.alpha = 0.5
+        self.alpha = 1
         self.k = 2
         self.lambd = math.pow(self.alpha, 2)*(self.n_dim+self.k) - self.n_dim
         self.covar_weights = np.zeros(self.n_sig)
@@ -97,8 +97,8 @@ class UKF:
         self.mean_weights[0] = (self.lambd / (self.n_dim + self.lambd))
 
         for i in range(1, self.n_sig):
-            self.covar_weights[i] = 1 / (2*(self.n_dim + self.lambd))
-            self.mean_weights[i] = 1 / (2*(self.n_dim + self.lambd))
+            self.covar_weights[i] = 1.0 / (2.0*(self.n_dim + self.lambd))
+            self.mean_weights[i] = 1.0 / (2.0*(self.n_dim + self.lambd))
 
         
 
@@ -116,6 +116,8 @@ class UKF:
             P_pred += self.covar_weights[i]*np.dot(diff.T, diff)
 
         Q = self.dynamic_model.Q(x, Ts)
+        import ipdb
+        ipdb.set_trace()
         P_pred += Q
 
         return GaussParams(x_pred, P_pred)
@@ -188,7 +190,6 @@ class UKF:
         import ipdb
         z_upd = np.zeros(m)
         S_upd = np.zeros((m, m))
-        ipdb.set_trace()
         for i in range(self.n_sig):
             z_upd += self.mean_weights[i]*sigmas_out[i]
 
