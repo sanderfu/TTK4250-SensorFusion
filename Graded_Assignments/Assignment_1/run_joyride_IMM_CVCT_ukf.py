@@ -140,12 +140,12 @@ if play_movie:
 sigma_z = 6
 clutter_intensity = 1e-5
 PD = 0.75
-gate_size = 4
+gate_size = 5
 
 # dynamic models
-sigma_a_CV = 1
-sigma_a_CT = 4
-sigma_omega = 0.05 * np.pi
+sigma_a_CV = 0.3
+sigma_a_CT = 6
+sigma_omega = 0.8 * np.pi
 
 
 # markov chain
@@ -268,7 +268,6 @@ axs3[1].set_ylim([0, 1])
 axs3[1].set_ylabel("mode probability")
 axs3[1].set_xlabel("time")
 axs3[1].legend()
-plt.show()
 
 # NEES
 fig4, axs4 = plt.subplots(3, sharex=True, num=4, clear=True)
