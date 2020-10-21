@@ -63,7 +63,7 @@ def test_quaternion_product():
     true_product = np.array([-0.89332,-0.00125,-0.42776,0.14194])
     assert(np.allclose(res, true_product, atol=0.0001)), "Does not return correct quaternion product."
     print("Test passed, quaternion product")
-test_quaternion_product()
+#test_quaternion_product()
 
 def quaternion_to_rotation_matrix(
     quaternion: np.ndarray, debug: bool = True
@@ -113,7 +113,7 @@ def test_quaternion_to_rotation_matrix():
     true_rot = np.array([[1, 0, 0,], [0, 0, -1], [0, 1, 0]])
     assert(np.allclose(rotation_mat, true_rot, atol=0.0001)), "Does not return correct quaternion product."
     print("Test passed, quaternion_to_rotation")
-test_quaternion_to_rotation_matrix()
+#test_quaternion_to_rotation_matrix()
 
 def quaternion_to_euler(quaternion: np.ndarray) -> np.ndarray:
     """Convert quaternion into euler angles
@@ -193,4 +193,4 @@ def test_quaternion_to_euler():
     euler = quaternion_to_euler(quat)
     assert(np.allclose(expected_euler, euler)), "Received euler angles are wrong"
     print("Quaternion to euler angles test passed")
-test_quaternion_to_euler()
+#test_quaternion_to_euler()

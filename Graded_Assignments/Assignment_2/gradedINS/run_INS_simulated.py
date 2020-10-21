@@ -135,9 +135,9 @@ cont_acc_bias_driving_noise_std = 6 * acc_bias_driving_noise_std / np.sqrt(1 / d
 p_std = 0.2*np.array([1, 1, 10])  # Measurement noise
 R_GNSS = np.diag(p_std ** 2)
 
-p_acc = 0
+p_acc = 1e-16
 
-p_gyro = 0
+p_gyro = 1e-16
 
 # %% Estimator
 eskf = ESKF(
@@ -428,36 +428,44 @@ axs6[2].boxplot([NEES_pos[0:N].T, NEES_vel[0:N].T, NEES_att[0:N].T, NEES_accbias
 axs6[2].legend(['NEES pos', 'NEES vel', 'NEES att', 'NEES accbias', 'NEES gyrobias', 'gauss (3 dim)'])
 plt.grid()
 
-
+plt.show()
 # %%
 from zipfile import ZipFile
 import datetime
-figures = [fig1, fig2, fig3, fig4, fig5, fig6]
-zipObj = ZipFile("test.zip", 'w')
+import re
+import os
+the_time = str(datetime.datetime.now())
+the_time = re.sub(r':',r';', the_time)
+the_time = re.sub(r' ',r'_', the_time)
+print(the_time)
+zipObj = ZipFile(f"test_sim{the_time}.zip", 'w')
 
 
 
-with open("tuning_parameters.txt", "w+") as f:
+# with open("tuning_parameters.txt", "w+") as f:
 
-    f.write(f"Steps:{steps}\n")
-    f.write(f"cont_gyro_noise_std:{cont_gyro_noise_std}\n")
-    f.write(f"cont_acc_noise_std :{cont_acc_noise_std}\n")
-    f.write(f"rate_std: {rate_std}\n")
-    f.write(f"acc_std: {acc_std}\n")
-    f.write(f"rate_bias_driving_noise_std:{rate_bias_driving_noise_std}\n")
-    f.write(f"cont_rate_bias_driving_noise_std:{cont_rate_bias_driving_noise_std}\n")
-    f.write(f"acc_bias_driving_noise_std:{acc_bias_driving_noise_std}\n")
-    f.write(f"cont_acc_bias_driving_noise_std :{cont_acc_bias_driving_noise_std }\n")
-    f.write(f"p_std:{p_std}\n")
-    f.write(f"R_GNSS:{R_GNSS}\n")
-    f.write(f"p_acc:{p_acc}\n")
-    f.write(f"p_gyro:{p_gyro}\n")
-    f.write(f"P_pred[0]:{P_pred[0]}\n")
-    f.write(f"x_pred[0]:{x_pred[0]}\n")
+#     f.write(f"Steps:{steps}\n")
+#     f.write(f"cont_gyro_noise_std:{cont_gyro_noise_std}\n")
+#     f.write(f"cont_acc_noise_std :{cont_acc_noise_std}\n")
+#     f.write(f"rate_std: {rate_std}\n")
+#     f.write(f"acc_std: {acc_std}\n")
+#     f.write(f"rate_bias_driving_noise_std:{rate_bias_driving_noise_std}\n")
+#     f.write(f"cont_rate_bias_driving_noise_std:{cont_rate_bias_driving_noise_std}\n")
+#     f.write(f"acc_bias_driving_noise_std:{acc_bias_driving_noise_std}\n")
+#     f.write(f"cont_acc_bias_driving_noise_std :{cont_acc_bias_driving_noise_std }\n")
+#     f.write(f"p_std:{p_std}\n")
+#     f.write(f"R_GNSS:{R_GNSS}\n")
+#     f.write(f"p_acc:{p_acc}\n")
+#     f.write(f"p_gyro:{p_gyro}\n")
+#     f.write(f"P_pred[0]:{P_pred[0]}\n")
+#     f.write(f"x_pred[0]:{x_pred[0]}\n")
 
-zipObj.write("tuning_parameters.txt")
-for i in range(len(figures)):
-    filename = f"fig{i}.pdf"
-    figures[i].savefig(filename)
+# zipObj.write("tuning_parameters.txt")
+zipObj.write("run_INS_simulated.py")
+for i in plt.get_fignums():
+    filename = f"fig_sim{i}{the_time}.pdf"
+    plt.figure(i)
+    plt.savefig(filename)
     zipObj.write(filename)
+    os.remove(filename)
 zipObj.close()

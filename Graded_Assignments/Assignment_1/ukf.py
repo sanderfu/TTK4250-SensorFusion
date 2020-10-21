@@ -59,32 +59,12 @@ class UKF:
         self._MLOG2PIby2: Final[float] = self.sensor_model.m * \
             np.log(2 * np.pi) / 2
 
-    def __get_sigmas(self, mean, cov):
-        ret = np.zeros((self.n_sig, self.n_dim))
-        tmp_mat = (self.n_dim + self.lambd)*cov
-        spr_mat = scipy.linalg.sqrtm(tmp_mat)
-        
-        ret[0] = mean
-
-        for i in range(self.n_dim):
-            ret[i+1] = mean+ spr_mat[i]
-            ret[i+1+self.n_dim] = mean-spr_mat[i]
-        return ret.T
-
-    def predict(self,
-                ekfstate: GaussParams,
-                # The sampling time in units specified by dynamic_model
-                Ts: float,
-                ) -> GaussParams:
-        """Predict the EKF state Ts seconds ahead."""
-        x, P = ekfstate  # tuple unpacking
-
-        self.n_dim = len(x)
+        self.n_dim = self.dynamic_model.n
         self.n_sig = 1 + self.n_dim*2
         
-        self.beta = 2
-        self.alpha = 0.5
-        self.k = 2
+        self.beta = float(2)
+        self.alpha = float(1)
+        self.k = float(3-self.n_dim)
         self.lambd = math.pow(self.alpha, 2)*(self.n_dim+self.k) - self.n_dim
         self.covar_weights = np.zeros(self.n_sig)
         self.mean_weights = np.zeros(self.n_sig)
@@ -93,194 +73,137 @@ class UKF:
         self.mean_weights[0] = (self.lambd / (self.n_dim + self.lambd))
 
         for i in range(1, self.n_sig):
-            self.covar_weights[i] = 1 / (2*(self.n_dim + self.lambd))
-            self.mean_weights[i] = 1 / (2*(self.n_dim + self.lambd))
+            self.covar_weights[i] = 1.0 / (2.0*(self.n_dim + self.lambd))
+            self.mean_weights[i] = 1.0 / (2.0*(self.n_dim + self.lambd))
 
+    def __get_sigmas(self, mean, cov):
+        ret = np.zeros((self.n_sig, self.n_dim))
+        tmp_mat = (self.n_dim + self.lambd)*cov
+        spr_mat = scipy.linalg.sqrtm(tmp_mat)
         
+        ret[0] = mean
+
+        import ipdb
+
+        for i in range(1, self.n_sig//2+1):
+            ret[i] = mean + spr_mat[i-1]
+            ret[i+self.n_dim] = mean-spr_mat[i-1]
+
+        ipdb.set_trace()
+        return ret
+
+    def predict(self,
+                ukfstate: GaussParams,
+                # The sampling time in units specified by dynamic_model
+                Ts: float,
+                ) -> GaussParams:
+        """Predict the EKF state Ts seconds ahead."""
+        x, P = ukfstate  # tuple unpacking
+
 
         sigmas = self.__get_sigmas(x, P)
-        sigmas_out = np.array([self.dynamic_model.f(x,Ts) for x in sigmas.T]).T
-
-        Q = self.dynamic_model.Q(x, Ts)
+        sigmas_out = np.array([self.dynamic_model.f(sig,Ts) for sig in sigmas])
 
         x_pred = np.zeros(self.n_dim)
         P_pred = np.zeros((self.n_dim, self.n_dim))
-        for i in range(self.n_dim):
-            x_pred[i] = np.sum((self.mean_weights[j]*sigmas_out[i][j] for j in range(self.n_sig)))
-        #Packing predicted mean and predicted covariance matrix into GaussParams object.
+        
         for i in range(self.n_sig):
-            diff = sigmas_out.T[i]-x_pred
-            diff = np.atleast_2d(diff)
-            P_pred += self.covar_weights[i]*np.dot(diff.T, diff)
+            x_pred += self.mean_weights[i]*sigmas_out[i]
 
+        for i in range(self.n_sig):
+            diff = sigmas_out[i]-x_pred
+            P_pred += self.covar_weights[i]*np.dot(diff, diff.T)
+
+        Q = self.dynamic_model.Q(x, Ts)
+        import ipdb
+        ipdb.set_trace()
         P_pred += Q
-        state_pred = GaussParams(x_pred, P_pred)
 
-        return state_pred
+        return GaussParams(x_pred, P_pred)
 
-    def innovation_mean(
-            self,
-            z: np.ndarray,
-            ekfstate: GaussParams,
-            *,
-            sensor_state: Dict[str, Any] = None,
-    ) -> np.ndarray:
-        """Calculate the innovation mean for ekfstate at z in sensor_state."""
 
-        x = ekfstate.mean
-
-        #Predicted measurement (Algorithm 1 p.54)
-        zbar = self.sensor_model.h(x)
-        
-        #Innovation (Algorithm 1 p.54)
-        v = z-zbar
-
-        return v
-
-    def innovation_cov(self,
-                       z: np.ndarray,
-                       ekfstate: GaussParams,
-                       *,
-                       sensor_state: Dict[str, Any] = None,
-                       ) -> np.ndarray:
-        """Calculate the innovation covariance for ekfstate at z in sensorstate."""
-
-        #Tuple unpacking
-        x, P = ekfstate
-        
-        
-        H = self.sensor_model.H(x, sensor_state=sensor_state)
-        R = self.sensor_model.R(x, sensor_state=sensor_state, z=z)
-        
-        #Innovation covariance (Algorithm 1, p.54)
-        S = H@P@H.T+R
-
-        return S
-
-    def innovation(self,
-                   z: np.ndarray,
-                   ekfstate: GaussParams,
-                   *,
-                   sensor_state: Dict[str, Any] = None,
-                   ) -> GaussParams:
-        """Calculate the innovation for ekfstate at z in sensor_state."""
-
-        v = self.innovation_mean(z,ekfstate)
-        S = self.innovation_cov(z,ekfstate)
-
-        innovationstate = GaussParams(v, S)
-
-        return innovationstate
 
     def update(
-        self, z: np.ndarray, ekfstate: GaussParams, sensor_state: Dict[str, Any] = None
+        self, z: np.ndarray, ukfstate: GaussParams, sensor_state: Dict[str, Any] = None
     ) -> GaussParams:
-        """Update ekfstate with z in sensor_state"""
-
-        x, P = ekfstate
-        m = self.sensor_model.m
-        sigmas = self.__get_sigmas(x, P)
-        sigmas_out = np.array([self.sensor_model.h(sig) for sig in sigmas.T]).T
+        """Update ukfstate with z in sensor_state"""
 
         import ipdb
+        x, P = ukfstate
+        ipdb.set_trace()
+        m = self.sensor_model.m
+        sigmas = self.__get_sigmas(x, P)
+        sigmas_out = np.array([self.sensor_model.h(sig) for sig in sigmas])
+
         z_upd = np.zeros(m)
         S_upd = np.zeros((m, m))
-        ipdb.set_trace()
         for i in range(self.n_sig):
             z_upd += self.mean_weights[i]*sigmas_out[i]
 
         for i in range(self.n_sig):
-            diff = sigmas_out.T[i]-z_upd
-            diff = np.atleast_2d(diff)
+            diff = sigmas_out[i]-z_upd
             S_upd += self.covar_weights[i]*np.dot(diff, diff.T)
 
         S_upd += self.sensor_model.R(x, sensor_state=sensor_state, z=z)
 
-        Sigma_upd = np.zeros((self.n_dim, self.n_dim))
+        Sigma_upd = np.zeros((self.n_dim, m))
         for i in range(self.n_sig):
-            left_diff = sigmas.T[i]-x
-            left_diff = np.atleast_2d(left_diff)
-            right_diff = sigmas_out.T[i]-z_upd
-            right_diff = np.atleast_2d(right_diff)
-            Sigma_upd += self.covar_weights[i][:len(z)]*np.dot(left_diff, right_diff.T)
+            left_diff = sigmas[i]-x
+            right_diff = sigmas_out[i]-z_upd
+            Sigma_upd += self.covar_weights[i]*np.outer(left_diff, right_diff)
 
-        kalman_gain = Sigma_up@np.linalg.inv(S_upd)
+        kalman_gain = Sigma_upd@np.linalg.inv(S_upd)
+        assert(kalman_gain.shape == (self.n_dim, m)), "Wrong shape for kalman gain"
 
-        x_upd = x_upd + kalman_gain@(z-z_upd)
-        P_upd = P - kalman_gain@S_upd*kalman_gain.T
+        x_upd = x + kalman_gain@(z-z_upd)
+        P_upd = P - kalman_gain@S_upd@kalman_gain.T
 
-        ekfstate_upd = GaussParams(x_upd, P_upd)
+        ukfstate_upd = GaussParams(x_upd, P_upd)
 
-        return ekfstate_upd
+        ipdb.set_trace()
+        return ukfstate_upd
 
     def step(self,
              z: np.ndarray,
-             ekfstate: GaussParams,
+             ukfstate: GaussParams,
              # sampling time
              Ts: float,
              *,
              sensor_state: Dict[str, Any] = None,
              ) -> GaussParams:
-        """Predict ekfstate Ts units ahead and then update this prediction with z in sensor_state."""
+        """Predict ukfstate Ts units ahead and then update this prediction with z in sensor_state."""
 
-        ekfstate_pred = self.predict(ekfstate,Ts)
-        ekfstate_upd = self.update(z,ekfstate_pred)
+        ukfstate_pred = self.predict(ukfstate,Ts)
+        ukfstate_upd = self.update(z,ukfstate_pred)
         
-        return ekfstate_upd
+        return ukfstate_upd
 
-    def NIS(self,
-            z: np.ndarray,
-            ekfstate: GaussParams,
-            *,
-            sensor_state: Dict[str, Any] = None,
-            ) -> float:
-        """Calculate the normalized innovation squared for ekfstate at z in sensor_state"""
-
-        v, S = self.innovation(z, ekfstate, sensor_state=sensor_state)
-
-        #Equation 4.66 p.67
-        NIS = v.T@la.inv(S)@v
-
-        return NIS
 
     @classmethod
-    def NEES(cls,
-             ekfstate: GaussParams,
-             # The true state to comapare against
-             x_true: np.ndarray,
-             ) -> float:
-        """Calculate the normalized etimation error squared from ekfstate to x_true."""
-
-        x, P = ekfstate
-
-        x_diff = x-x_true
-        
-        #Equation 4.65 p. 67
-        NEES = x_diff.T@la.inv(P)@x_diff
-        
-        return NEES
 
     def gate(self,
              z: np.ndarray,
-             ekfstate: GaussParams,
+             ukfstate: GaussParams,
              *,
              sensor_state: Dict[str, Any],
              gate_size_square: float,
              ) -> bool:
         """Check if z is inside sqrt(gate_sized_squared)-sigma ellipse of
-        ekfstate in sensor_state """
+        ukfstate in sensor_state """
 
         #Equation unnumbered, page 116.
-        gated = self.NIS(z,ekfstate,sensor_state=sensor_state)<gate_size_square
+        x, P = ukfstate
+        innov = z-self.sensor_model.h(x)
+        gated = innov@P@innov.T<gate_size_square
         return gated
 
     def loglikelihood(
         self,
         z: np.ndarray,
-        ekfstate: GaussParams,
+        ukfstate: GaussParams,
         sensor_state: Optional[Dict[str, Any]] = None,
     ) -> float:
-        """Calculate the log likelihood of ekfstate at z in sensor_state
+        """Calculate the log likelihood of ukfstate at z in sensor_state
             Comment: This function was retrieved from Blackboard.
             Comment2: What they ask for here is log(p(z|x_k(posteriori))) for a 
             realization of z. I should modify this function to allow for using 
@@ -289,7 +212,7 @@ class UKF:
             the same thign as the measurement function (Eq. 4.6)
         """
     
-        v, S = self.innovation(z, ekfstate, sensor_state=sensor_state)
+        v, S = self.innovation(z, ukfstate, sensor_state=sensor_state)
     
         cholS = la.cholesky(S, lower=True)
     
@@ -308,17 +231,17 @@ class UKF:
         return ll
 
     @classmethod
-    def estimate(cls, ekfstate: GaussParams):
+    def estimate(cls, ukfstate: GaussParams):
         """Get the estimate from the state with its covariance. (Compatibility method)"""
         # dummy function for compatibility with IMM class
-        return ekfstate
+        return ukfstate
 
     def estimate_sequence(
             self,
             # A sequence of measurements
             Z: Sequence[np.ndarray],
             # the initial KF state to use for either prediction or update (see start_with_prediction)
-            init_ekfstate: GaussParams,
+            init_ukfstate: GaussParams,
             # Time difference between Z's. If start_with_prediction: also diff before the first Z
             Ts: Union[float, Sequence[float]],
             *,
@@ -344,28 +267,28 @@ class UKF:
         sensor_state_seq = sensor_state or [None] * K
 
         # initialize and allocate
-        ekfupd = init_ekfstate
-        n = init_ekfstate.mean.shape[0]
-        ekfpred_list = GaussParamList.allocate(K, n)
-        ekfupd_list = GaussParamList.allocate(K, n)
+        ukfupd = init_ukfstate
+        n = init_ukfstate.mean.shape[0]
+        ukfpred_list = GaussParamList.allocate(K, n)
+        ukfupd_list = GaussParamList.allocate(K, n)
 
         # perform the actual predict and update cycle
         # DONE loop over the data and get both the predicted and updated states in the lists
         # the predicted is good to have for evaluation purposes
         # A potential pythonic way of looping through  the data
         for k, (zk, Tsk, ssk) in enumerate(zip(Z, Ts_arr, sensor_state_seq)):
-            ekfpred = self.predict(ekfupd,Tsk)
-            ekfupd = self.update(zk,ekfpred,Tsk)
-            ekfpred_list[k]=ekfpred
-            ekfupd_list[k]=ekfupd
-        return ekfpred_list, ekfupd_list
+            ukfpred = self.predict(ukfupd,Tsk)
+            ukfupd = self.update(zk,ukfpred,Tsk)
+            ukfpred_list[k]=ukfpred
+            ukfupd_list[k]=ukfupd
+        return ukfpred_list, ukfupd_list
 
     def performance_stats(
             self,
             *,
             z: Optional[np.ndarray] = None,
-            ekfstate_pred: Optional[GaussParams] = None,
-            ekfstate_upd: Optional[GaussParams] = None,
+            ukfstate_pred: Optional[GaussParams] = None,
+            ukfstate_upd: Optional[GaussParams] = None,
             sensor_state: Optional[Dict[str, Any]] = None,
             x_true: Optional[np.ndarray] = None,
             # None: no norm, -1: all idx, seq: a single norm for given idxs, seqseq: a norms for idxseq
@@ -377,18 +300,18 @@ class UKF:
         stats: Dict[str, Union[float, List[float]]] = {}
 
         # NIS, needs measurements
-        if z is not None and ekfstate_pred is not None:
+        if z is not None and ukfstate_pred is not None:
             stats['NIS'] = self.NIS(
-                z, ekfstate_pred, sensor_state=sensor_state)
+                z, ukfstate_pred, sensor_state=sensor_state)
 
         # NEES and RMSE, needs ground truth
         if x_true is not None:
             # prediction
-            if ekfstate_pred is not None:
-                stats['NEESpred'] = self.NEES(ekfstate_pred, x_true)
+            if ukfstate_pred is not None:
+                stats['NEESpred'] = self.NEES(ukfstate_pred, x_true)
 
                 # distances
-                err_pred = ekfstate_pred.mean - x_true
+                err_pred = ukfstate_pred.mean - x_true
                 if norm_idxs is None:
                     stats['dist_pred'] = np.linalg.norm(err_pred, ord=norms)
                 elif isinstance(norm_idxs, Iterable) and isinstance(norms, Iterable):
@@ -397,11 +320,11 @@ class UKF:
                         for idx, ord in zip(norm_idxs, norms)]
 
             # update
-            if ekfstate_upd is not None:
-                stats['NEESupd'] = self.NEES(ekfstate_upd, x_true)
+            if ukfstate_upd is not None:
+                stats['NEESupd'] = self.NEES(ukfstate_upd, x_true)
 
                 # distances
-                err_upd = ekfstate_upd.mean - x_true
+                err_upd = ukfstate_upd.mean - x_true
                 if norm_idxs is None:
                     stats['dist_upd'] = np.linalg.norm(err_upd, ord=norms)
                 elif isinstance(norm_idxs, Iterable) and isinstance(norms, Iterable):
@@ -417,8 +340,8 @@ class UKF:
             *,
             # The measurements
             Z: Optional[Iterable[np.ndarray]] = None,
-            ekfpred_list: Optional[Iterable[GaussParams]] = None,
-            ekfupd_list: Optional[Iterable[GaussParams]] = None,
+            ukfpred_list: Optional[Iterable[GaussParams]] = None,
+            ukfupd_list: Optional[Iterable[GaussParams]] = None,
             # An optional sequence of all the sensor states when Z was recorded
             sensor_state: Optional[Iterable[Optional[Dict[str, Any]]]] = None,
             # Optional ground truth for error checking
@@ -435,16 +358,16 @@ class UKF:
 
         for_iter = []
         for_iter.append(Z if Z is not None else None_list)
-        for_iter.append(ekfpred_list or None_list)
-        for_iter.append(ekfupd_list or None_list)
+        for_iter.append(ukfpred_list or None_list)
+        for_iter.append(ukfupd_list or None_list)
         for_iter.append(sensor_state or None_list)
         for_iter.append(X_true if X_true is not None else None_list)
 
         stats = []
-        for zk, ekfpredk, ekfupdk, ssk, xtk in zip(*for_iter):
+        for zk, ukfpredk, ukfupdk, ssk, xtk in zip(*for_iter):
             stats.append(
                 self.performance_stats(
-                    z=zk, ekfstate_pred=ekfpredk, ekfstate_upd=ekfupdk, sensor_state=ssk, x_true=xtk,
+                    z=zk, ukfstate_pred=ukfpredk, ukfstate_upd=ukfupdk, sensor_state=ssk, x_true=xtk,
                     norm_idxs=norm_idxs, norms=norms
                 )
             )
@@ -457,12 +380,12 @@ class UKF:
         return stats_arr
 
     def reduce_mixture(
-        self, ekfstate_mixture: MixtureParameters[GaussParams]
+        self, ukfstate_mixture: MixtureParameters[GaussParams]
     ) -> GaussParams:
         """Merge a Gaussian mixture into single mixture"""
-        w = ekfstate_mixture.weights
-        x = np.array([c.mean for c in ekfstate_mixture.components], dtype=float)
-        P = np.array([c.cov for c in ekfstate_mixture.components], dtype=float)
+        w = ukfstate_mixture.weights
+        x = np.array([c.mean for c in ukfstate_mixture.components], dtype=float)
+        P = np.array([c.cov for c in ukfstate_mixture.components], dtype=float)
         x_reduced, P_reduced = mixturereduction.gaussian_mixture_moments(w, x, P)
         return GaussParams(x_reduced, P_reduced)
     
