@@ -87,7 +87,7 @@ sigma_omega = 0.002 * np.pi
 
 # initial values
 init_mean = np.array([2, 0, 0, 0, 0])
-init_cov = np.diag([25, 25, 3, 3, 0.0005]) ** 2
+init_cov = np.diag([5, 5, 1, 1, 0.0005]) ** 2
 
 init_state_CV = GaussParams(init_mean[:4], init_cov[:4, :4])  # get rid of turn rate
 init_state_CT = GaussParams(init_mean, init_cov)  # same init otherwise
@@ -143,20 +143,19 @@ for i, (ukf_filter, init) in enumerate(zip(filters, init_states)):
     P_hat = np.array([u.cov for u in ukfupd_list])
 
 
-    err_pred[i, 0] = estats.distance_sequence_indexed(x_bar, Xgt, np.arange(2))
-    err_pred[i, 1] = estats.distance_sequence_indexed(x_bar, Xgt, np.arange(2, 4))
-    err_upd[i, 0] = estats.distance_sequence_indexed(x_hat, Xgt, np.arange(2))
-    err_upd[i, 1] = estats.distance_sequence_indexed(x_hat, Xgt, np.arange(2, 4))
+    #err_pred[i, 0] = estats.distance_sequence_indexed(x_bar, Xgt, np.arange(2))
+    #err_pred[i, 1] = estats.distance_sequence_indexed(x_bar, Xgt, np.arange(2, 4))
+    #err_upd[i, 0] = estats.distance_sequence_indexed(x_hat, Xgt, np.arange(2))
+    #err_upd[i, 1] = estats.distance_sequence_indexed(x_hat, Xgt, np.arange(2, 4))
 
 
 # errors
-RMSE_pred = err_pred.mean(axis=2)
-RMSE_upd = err_upd.mean(axis=2)
+import ipdb
+ipdb.set_trace()
 
-
-raise Exception("Not implemented the rest yet")
 
 # plot
+"""
 fig2, axs2 = plt.subplots(2, 2, num=2, clear=True)
 for axu, axl, u_s, rmse_pred, rmse_upd in zip(
     axs2[0], axs2[1], upd, RMSE_pred, RMSE_upd
@@ -187,14 +186,14 @@ axs3[2].plot(np.arange(K) * Ts, err_upd[:, 1].T)
 # axs3[2].plot(np.arange(K) * Ts, err_upd[1, :, 1])
 axs3[2].set_title("vel error")
 
+"""
 # %% tune IMM by only looking at the measurements
-sigma_z = 3
+sigma_z = 3.0
 sigma_a_CV = 0.2
 sigma_a_CT = 0.1
 sigma_omega = 0.002 * np.pi
 PI = np.array([[0.95, 0.05], [0.05, 0.95]])
 assert np.allclose(PI.sum(axis=1), 1), "rows of PI must sum to 1"
-
 # make model
 measurement_model = measurementmodels.CartesianPosition(sigma_z, state_dim=5)
 CV = dynamicmodels.WhitenoiseAccelleration(sigma_a_CV, n=5)
@@ -228,14 +227,6 @@ for zk in Z:
 x_est = np.array([est.mean for est in imm_ests])
 prob_est = np.array([upds.weights for upds in imm_upds])
 
-# consistency
-NISes_comb = [imm_filter.NISes(zk, pred_k) for zk, pred_k in zip(Z, imm_preds)]
-NIS = np.array([n[0] for n in NISes_comb])
-NISes = np.array([n[1] for n in NISes_comb])
-ANIS = NIS.mean()
-CINIS = np.array(scipy.stats.chi2.interval(0.9, 2))
-CIANIS = np.array(scipy.stats.chi2.interval(0.9, 2 * K)) / K
-print(f"ANIS={ANIS} with CIANIS={CIANIS}")
 
 # plot
 fig4, axs4 = plt.subplots(2, 2, num=4, clear=True)
@@ -246,171 +237,4 @@ axs4[0, 1].plot(np.arange(K) * Ts, x_est[:, 4], label=r"$\omega$")
 axs4[0, 1].legend()
 axs4[1, 0].plot(np.arange(K) * Ts, prob_est, label=r"$Pr(s)$")
 axs4[1, 0].legend()
-axs4[1, 1].plot(np.arange(K) * Ts, NIS, label="NIS")
-axs4[1, 1].plot(np.arange(K) * Ts, NISes)
-
-ratio_in_CI = np.sum(np.less_equal(CINIS[0], NIS) * np.less_equal(NIS, CINIS[1])) / K
-CI_LABELS = ["CI0", "CI1"]
-for ci, cilbl in zip(CINIS, CI_LABELS):
-    axs4[1, 1].plot([1, K * Ts], np.ones(2) * ci, "--r", label=cilbl)
-axs4[1, 1].text(K * Ts * 1.1, 1, f"{ratio_in_CI} inside CI", rotation=90)
-axs4[1, 1].legend()
-
-# %% tune IMM by looking at ground truth
-sigma_z = 3
-sigma_a_CV = 0.2
-sigma_a_CT = 0.1
-sigma_omega = 0.002 * np.pi
-PI = np.array([[0.95, 0.05], [0.05, 0.95]])
-assert np.allclose(PI.sum(axis=1), 1), "rows of PI must sum to 1"
-
-# make model
-measurement_model = measurementmodels.CartesianPosition(sigma_z, state_dim=5)
-CV = dynamicmodels.WhitenoiseAccelleration(sigma_a_CV, n=5)
-CT = dynamicmodels.ConstantTurnrate(sigma_a_CT, sigma_omega)
-ukf_filters = []
-ukf_filters.append(ukf.UKF(CV, measurement_model))
-ukf_filters.append(ukf.UKF(CT, measurement_model))
-imm_filter = imm.IMM(ukf_filters, PI)
-
-init_weights = np.array([0.5] * 2)
-init_mean = [0] * 5
-init_cov = np.diag(
-    [1] * 5
-)  # HAVE TO BE DIFFERENT: use intuition, eg. diag guessed distance to true values squared.
-init_mode_states = [GaussParams(init_mean, init_cov)] * 2  # copy of the two modes
-init_immstate = MixtureParameters(init_weights, init_mode_states)
-
-imm_preds = []
-imm_upds = []
-imm_ests_pred = []
-imm_ests_upd = []
-
-updated_immstate = init_immstate
-for zk in Z:
-    predicted_immstate = imm_filter.predict(updated_immstate, Ts)
-    updated_immstate = imm_filter.update(zk, predicted_immstate)
-
-    estimate_pred = imm_filter.estimate(predicted_immstate)
-    estimate_upd = imm_filter.estimate(updated_immstate)
-
-    imm_preds.append(predicted_immstate)
-    imm_upds.append(updated_immstate)
-
-    imm_ests_pred.append(estimate_pred)
-    imm_ests_upd.append(estimate_upd)
-
-# extract all means and covs
-x_bar = np.array([est.mean for est in imm_ests_pred])
-P_bar = np.array([est.cov for est in imm_ests_pred])
-
-x_hat = np.array([est.mean for est in imm_ests_upd])
-P_hat = np.array([est.cov for est in imm_ests_upd])
-
-x_bar_modes = np.array([[comp.mean for comp in pr.components] for pr in imm_preds])
-P_bar_modes = np.array([[comp.cov for comp in pr.components] for pr in imm_preds])
-
-x_hat_modes = np.array([[comp.mean for comp in pr.components] for pr in imm_upds])
-P_hat_modes = np.array([[comp.cov for comp in pr.components] for pr in imm_upds])
-
-mode_prob = np.array([upds.weights for upds in imm_upds])
-
-# consistency: NIS
-NISes_comb = (imm_filter.NISes(zk, pred_k) for zk, pred_k in zip(Z, imm_preds))
-NIS, NISes = [np.array(n) for n in zip(*NISes_comb)]
-ANIS = NIS.mean()
-CINIS = np.array(scipy.stats.chi2.interval(0.9, 2))
-CIANIS = np.array(scipy.stats.chi2.interval(0.9, 2 * K)) / K
-
-# consistency: NEES
-NEES_pred = estats.NEES_sequence_indexed(x_bar, P_bar, Xgt, idxs=np.arange(4))
-NEESes_pred = np.array(
-    [
-        estats.NEES_sequence_indexed(x, P, Xgt, idxs=np.arange(4))
-        for x, P in zip(x_bar_modes, P_bar_modes)
-    ]
-)
-NEES_upd = estats.NEES_sequence_indexed(x_hat, P_hat, Xgt, idxs=np.arange(4))
-NEESes_upd = np.array(
-    [
-        estats.NEES_sequence_indexed(x, P, Xgt, idxs=np.arange(4))
-        for x, P in zip(x_hat_modes, P_hat_modes)
-    ]
-)
-
-ANEES_pred = NEES_pred.mean()
-ANEES_upd = NEES_upd.mean()
-
-CINEES = np.array(scipy.stats.chi2.interval(0.9, 4))
-CIANEES = np.array(scipy.stats.chi2.interval(0.9, 4 * K)) / K
-print(f"ANIS={ANIS} and CIANIS={CIANIS}")
-print(f"ANEES_upd={ANEES_upd}, ANEES_pred={ANEES_pred} and CIANEES={CIANEES}")
-
-#  errors
-pos_err = estats.distance_sequence_indexed(x_hat, Xgt, idxs=np.arange(2))
-# np.sqrt(np.sum((x_est[:, :2] - Xgt[:, :2]) ** 2, axis=1))
-vel_err = estats.distance_sequence_indexed(x_hat, Xgt, idxs=np.arange(2, 4))
-# np.sqrt(np.sum((x_est[:, 2:4] - Xgt[:, 2:4]) ** 2, axis=1))
-pos_RMSE = np.sqrt(
-    np.mean(pos_err ** 2)
-)  # not true RMSE (which is over monte carlo simulations)
-vel_RMSE = np.sqrt(
-    np.mean(vel_err ** 2)
-)  # not true RMSE (which is over monte carlo simulations)
-pos_peak_deviation = pos_err.max()
-vel_peak_deviation = vel_err.max()
-
-rmsestr = ", ".join(f"{num:.3f}" for num in (pos_RMSE, vel_RMSE))
-devstr = ", ".join(f"{num:.3f}" for num in (pos_peak_deviation, vel_peak_deviation))
-# plot
-fig5, axs5 = plt.subplots(2, 2, num=5, clear=True)
-axs5[0, 0].plot(*x_hat.T[:2], label="est", color="C0")
-axs5[0, 0].scatter(*Z.T, label="z", color="C1")
-axs5[0, 0].legend()
-axs5[0, 0].set_title(f"RMSE(p, v) = {rmsestr}\npeak_dev(p, v) = {devstr}.0")
-axs5[0, 1].plot(np.arange(K) * Ts, x_hat[:, 4], label=r"$\hat{\omega}$")
-axs5[0, 1].plot(np.arange(K) * Ts, Xgt[:, 4], label=r"$\omega$")
-axs5[0, 1].legend()
-for s in range(len(ukf_filters)):
-    axs5[1, 0].plot(np.arange(K) * Ts, prob_est[:, s], label=rf"$Pr(s={s})$")
-axs5[1, 0].legend()
-axs5[1, 1].plot(np.arange(K) * Ts, NIS, label="NIS")
-axs5[1, 1].plot(np.arange(K) * Ts, NISes)
-
-ratio_in_CI = np.sum(np.less_equal(CINIS[0], NIS) * np.less_equal(NIS, CINIS[1])) / K
-CI_LABELS = ["CI0", "CI1"]
-for ci, cilbl in zip(CINIS, CI_LABELS):
-    axs5[1, 1].plot([1, K * Ts], np.ones(2) * ci, "--r", label=cilbl)
-axs5[1, 1].text(K * Ts * 1.1, 1, f"{ratio_in_CI} inside CI", rotation=90)
-axs5[1, 1].legend()
-
-fig6, axs6 = plt.subplots(2, 2, sharex=True, num=6, clear=True)
-axs6[0, 0].plot(np.arange(K) * Ts, pos_err)
-axs6[0, 0].set_ylabel("position error")
-axs6[0, 1].plot(np.arange(K) * Ts, vel_err)
-axs6[0, 1].yaxis.set_label_position("right")
-axs6[0, 1].set_ylabel("velocity error")
-axs6[1, 0].plot(np.arange(K) * Ts, NIS)
-axs6[1, 0].plot(np.arange(K) * Ts, NISes)
-ratio_in_CI = np.mean(np.less_equal(CINIS[0], NIS) * np.less_equal(NIS, CINIS[1]))
-axs6[1, 0].set_ylabel(f"NIS: {ratio_in_CI}% in CI")
-axs6[1, 0].plot([0, Ts * (K - 1)], np.repeat(CINIS[None], 2, 0), "r--")
-# axs6[1, 0].text(K * Ts * 1.1, -2, f"{ratio_in_CI}% inside CI", rotation=90)
-axs6[1, 0].set_ylim([0, 2 * CINIS[1]])
-
-axs6[1, 1].plot(np.arange(K) * Ts, NEES_pred)
-axs6[1, 1].plot(np.arange(K) * Ts, NEES_upd)
-# axs6[1, 1].plot(np.arange(K) * Ts, NISes)
-ratio_in_CI_nees = np.mean(
-    np.less_equal(CINEES[0], NEES_upd) * np.less_equal(NEES_upd, CINEES[1])
-)
-# axs6[1, 1].text(K * Ts * 1.1, -2, f"{ratio_in_CI_nees}% inside CI", rotation=90)
-axs6[1, 1].yaxis.set_label_position("right")
-axs6[1, 1].set_ylabel(f"NEES: {ratio_in_CI_nees}% in CI")
-axs6[1, 1].plot([0, Ts * (K - 1)], np.repeat(CINEES[None], 2, 0), "r--")
-axs6[1, 1].set_ylim([0, 2 * CINEES[1]])
-# axs6[1, 1].text(K * Ts * 1.1, -2, f"{ratio_in_CI_nees}% inside CI", rotation=90)
-
-# %%
-
-# %%
+plt.show()

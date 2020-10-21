@@ -43,7 +43,7 @@ from mixturedata import MixtureParameters
 import mixturereduction
 from singledispatchmethod import singledispatchmethod
 
-# %% The EKF
+# %% The UKF
 
 
 @dataclass
@@ -83,13 +83,11 @@ class UKF:
         
         ret[0] = mean
 
-        import ipdb
 
         for i in range(1, self.n_sig//2+1):
             ret[i] = mean + spr_mat[i-1]
             ret[i+self.n_dim] = mean-spr_mat[i-1]
 
-        ipdb.set_trace()
         return ret
 
     def predict(self,
@@ -97,7 +95,7 @@ class UKF:
                 # The sampling time in units specified by dynamic_model
                 Ts: float,
                 ) -> GaussParams:
-        """Predict the EKF state Ts seconds ahead."""
+        """Predict the UKF state Ts seconds ahead."""
         x, P = ukfstate  # tuple unpacking
 
 
@@ -112,12 +110,11 @@ class UKF:
 
         for i in range(self.n_sig):
             diff = sigmas_out[i]-x_pred
-            P_pred += self.covar_weights[i]*np.dot(diff, diff.T)
+            P_pred += self.covar_weights[i]*np.outer(diff, diff)
 
         Q = self.dynamic_model.Q(x, Ts)
-        import ipdb
-        ipdb.set_trace()
         P_pred += Q
+
 
         return GaussParams(x_pred, P_pred)
 
@@ -130,7 +127,6 @@ class UKF:
 
         import ipdb
         x, P = ukfstate
-        ipdb.set_trace()
         m = self.sensor_model.m
         sigmas = self.__get_sigmas(x, P)
         sigmas_out = np.array([self.sensor_model.h(sig) for sig in sigmas])
@@ -142,7 +138,7 @@ class UKF:
 
         for i in range(self.n_sig):
             diff = sigmas_out[i]-z_upd
-            S_upd += self.covar_weights[i]*np.dot(diff, diff.T)
+            S_upd += self.covar_weights[i]*np.outer(diff, diff)
 
         S_upd += self.sensor_model.R(x, sensor_state=sensor_state, z=z)
 
@@ -160,8 +156,22 @@ class UKF:
 
         ukfstate_upd = GaussParams(x_upd, P_upd)
 
-        ipdb.set_trace()
         return ukfstate_upd
+
+    def NIS(self,
+            z: np.ndarray,
+            ekfstate: GaussParams,
+            *,
+            sensor_state: Dict[str, Any] = None,
+            ) -> float:
+        """Calculate the normalized innovation squared for ekfstate at z in sensor_state"""
+
+        v, S = self.innovation(z, ekfstate, sensor_state=sensor_state)
+
+        #Equation 4.66 p.67
+        NIS = v.T@la.inv(S)@v
+
+        return NIS
 
     def step(self,
              z: np.ndarray,
@@ -179,7 +189,6 @@ class UKF:
         return ukfstate_upd
 
 
-    @classmethod
 
     def gate(self,
              z: np.ndarray,
@@ -191,10 +200,8 @@ class UKF:
         """Check if z is inside sqrt(gate_sized_squared)-sigma ellipse of
         ukfstate in sensor_state """
 
-        #Equation unnumbered, page 116.
-        x, P = ukfstate
-        innov = z-self.sensor_model.h(x)
-        gated = innov@P@innov.T<gate_size_square
+        innov, cov = self.innovation(z=z, ukfstate=ukfstate, sensor_state=sensor_state)
+        gated = innov@cov@innov.T<gate_size_square
         return gated
 
     def loglikelihood(
@@ -211,6 +218,7 @@ class UKF:
             Comment3: For completeness, realize that likelihood function is 
             the same thign as the measurement function (Eq. 4.6)
         """
+        
     
         v, S = self.innovation(z, ukfstate, sensor_state=sensor_state)
     
@@ -229,6 +237,69 @@ class UKF:
         # ll = scipy.stats.multivariate_normal.logpdf(v, cov=S)
     
         return ll
+
+    def innovation_mean(
+            self,
+            z: np.ndarray,
+            ukfstate: GaussParams,
+            *,
+            sensor_state: Dict[str, Any] = None,
+    ) -> np.ndarray:
+        """Calculate the innovation mean for ukfstate at z in sensor_state."""
+
+        x, P = ukfstate
+
+        sigmas = self.__get_sigmas(x, P)
+        sigmas_out = np.array([self.sensor_model.h(sig) for sig in sigmas])
+        z_upd = np.zeros(self.sensor_model.m)
+        for i in range(self.n_sig):
+            z_upd += self.mean_weights[i]*sigmas_out[i]
+
+        
+        v = z-z_upd
+
+        return v
+
+    def innovation_cov(self,
+                       z: np.ndarray,
+                       ukfstate: GaussParams,
+                       *,
+                       sensor_state: Dict[str, Any] = None,
+                       ) -> np.ndarray:
+        """Calculate the innovation covariance for ukfstate at z in sensorstate."""
+
+        #Tuple unpacking
+        x, P = ukfstate
+        sigmas = self.__get_sigmas(x, P)
+        sigmas_out = np.array([self.sensor_model.h(sig) for sig in sigmas])
+        z_upd = np.zeros(self.sensor_model.m)
+        for i in range(self.n_sig):
+            z_upd += self.mean_weights[i]*sigmas_out[i]
+
+        S_upd = np.zeros((self.sensor_model.m, self.sensor_model.m))
+        for i in range(self.n_sig):
+            diff = sigmas_out[i]-z_upd
+            S_upd += self.covar_weights[i]*np.outer(diff, diff)
+
+        S_upd += self.sensor_model.R(x, sensor_state=sensor_state, z=z)
+        
+        return S_upd
+
+    def innovation(self,
+                   z: np.ndarray,
+                   ukfstate: GaussParams,
+                   *,
+                   sensor_state: Dict[str, Any] = None,
+                   ) -> GaussParams:
+        """Calculate the innovation for ukfstate at z in sensor_state."""
+
+        v = self.innovation_mean(z,ukfstate)
+        S = self.innovation_cov(z,ukfstate)
+
+        innovationstate = GaussParams(v, S)
+
+        return innovationstate
+
 
     @classmethod
     def estimate(cls, ukfstate: GaussParams):
@@ -392,7 +463,7 @@ class UKF:
     @singledispatchmethod
     def init_filter_state(self, init) -> None:
         raise NotImplementedError(
-            f"EKF do not know how to make {init} into GaussParams"
+            f"UKF do not know how to make {init} into GaussParams"
         )
     
     @init_filter_state.register(GaussParams)
@@ -419,7 +490,7 @@ class UKF:
     
         assert (
             got_mean and got_cov
-        ), f"EKF do not recognize mean and cov keys in the dict {init}."
+        ), f"UKF do not recognize mean and cov keys in the dict {init}."
     
         return GaussParams(mean, cov)
 
