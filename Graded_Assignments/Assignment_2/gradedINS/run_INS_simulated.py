@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import eskf
 
+save_results = False
+
 try: # see if tqdm is available, otherwise define it as a dummy
     try: # Ipython seem to require different tqdm.. try..except seem to be the easiest way to check
         __IPYTHON__
@@ -16,7 +18,7 @@ try: # see if tqdm is available, otherwise define it as a dummy
     except:
         from tqdm import tqdm, tnrange
         print("NOT IPYTHON")
-        
+
 except Exception as e:
     print(e)
     print(
@@ -149,7 +151,7 @@ eskf = ESKF(
     p_gyro,
     S_a=S_a, # set the accelerometer correction matrix
     S_g=S_g, # set the gyro correction matrix,
-    debug=True # TODO: False to avoid expensive debug checks, can also be suppressed by calling 'python -O run_INS_simulated.py'
+    debug=False # TODO: False to avoid expensive debug checks, can also be suppressed by calling 'python -O run_INS_simulated.py'
 )
 
 # %% Allocate
@@ -196,10 +198,10 @@ for k in tqdm(range(N)):
 
         x_est[k,:], P_est[k] = eskf.update_GNSS_position(x_pred[k], P_pred[k], z_GNSS[GNSSk], R_GNSS, lever_arm)
         NIS[GNSSk] = eskf.NIS_GNSS_position(x_est[k],P_est[k], z_GNSS[GNSSk], R_GNSS, lever_arm)
-        
+
         if eskf.debug:
             assert np.all(np.isfinite(P_est[k])), f"Not finite P_pred at index {k}"
-        
+
         GNSSk += 1
     else:
         # no updates, so let us take estimate = prediction
@@ -221,7 +223,7 @@ for k in tqdm(range(N)):
 
     if eskf.debug:
         assert np.all(np.isfinite(P_pred[k])), f"Not finite P_pred at index {k + 1}"
-   
+
 
 # %% Plots
 
@@ -462,11 +464,13 @@ zipObj = ZipFile(f"test_sim{the_time}.zip", 'w')
 #     f.write(f"x_pred[0]:{x_pred[0]}\n")
 
 # zipObj.write("tuning_parameters.txt")
-zipObj.write("run_INS_simulated.py")
-for i in plt.get_fignums():
-    filename = f"fig_sim{i}{the_time}.pdf"
-    plt.figure(i)
-    plt.savefig(filename)
-    zipObj.write(filename)
-    os.remove(filename)
-zipObj.close()
+
+if save_results:
+    zipObj.write("run_INS_simulated.py")
+    for i in plt.get_fignums():
+        filename = f"fig_sim{i}{the_time}.pdf"
+        plt.figure(i)
+        plt.savefig(filename)
+        zipObj.write(filename)
+        os.remove(filename)
+    zipObj.close()

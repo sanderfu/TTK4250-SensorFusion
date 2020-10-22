@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.linalg as la
 
+save_results = False
+
 try: # see if tqdm is available, otherwise define it as a dummy
     try: # Ipython seem to require different tqdm.. try..except seem to be the easiest way to check
         __IPYTHON__
@@ -111,7 +113,7 @@ accuracy_GNSS = loaded_data['GNSSaccuracy'].ravel()
 
 dt = np.mean(np.diff(timeIMU))
 steps = len(z_acceleration)
-steps = 75000
+steps = 5000
 gnss_steps = len(z_GNSS)
 
 # %% Measurement noise
@@ -136,7 +138,7 @@ p_std = np.array([(np.mean(accuracy_GNSS))]*3)  # Measurement noise
 
 def RGNSS(GNSSk):
     return np.diag(((0.3**2)*accuracy_GNSS[GNSSk]**2)*np.array([0.9**2,0.9**2, 5**2]))
-    
+
 
 # Position and velocity measurement
 p_acc = 1e-3
@@ -212,10 +214,10 @@ def nis_calculations(x, P, z, GNSSk):
     NIS_altitude[GNSSk] = eskf.NIS_Altitude(x, P, z, R, lever_arm)
 
 for k in tqdm(range(N)):
-    
-    
+
+
     if doGNSS and timeIMU[k] >= timeGNSS[GNSSk]:
-        
+
         # if stationary:
         #     if GNSSk>0 and abs(la.norm(z_GNSS[GNSSk])-la.norm(z_GNSS[GNSSk-1])>diff_to_change):
         #         stationary=False
@@ -235,14 +237,14 @@ for k in tqdm(range(N)):
         nis_thread = threading.Thread(target=nis_calculations, args=(x_est[k],P_est[k], z_GNSS[GNSSk], GNSSk))
         nis_thread.start()
         nis_threads.append(nis_thread)
-        
+
 
         if eskf.debug:
             assert np.all(np.isfinite(P_est[k])), f"Not finite P_pred at index {k}"
-        
+
         GNSSk += 1
     else:
-        
+
         # if stationary:
         #     x_pred[k+1]=x_pred[k]
         #     P_pred[k+1]=P_pred[k]
@@ -256,7 +258,7 @@ for k in tqdm(range(N)):
 
     if eskf.debug:
         assert np.all(np.isfinite(P_pred[k])), f"Not finite P_pred at index {k + 1}"
- 
+
 
 # %% Plots
 for thr in nis_threads:
@@ -363,11 +365,13 @@ zipObj = ZipFile(f"test_real{the_time}.zip", 'w')
 #     f.write(f"x_pred[0]:{x_pred[0]}\n")
 
 # zipObj.write("tuning_parameters.txt")
-zipObj.write("run_INS_real.py")
-for i in plt.get_fignums():
-    filename = f"fig_real{i}{the_time}.pdf"
-    plt.figure(i)
-    plt.savefig(filename)
-    zipObj.write(filename)
-    os.remove(filename)
-zipObj.close()
+
+if save_results:
+    zipObj.write("run_INS_real.py")
+    for i in plt.get_fignums():
+        filename = f"fig_real{i}{the_time}.pdf"
+        plt.figure(i)
+        plt.savefig(filename)
+        zipObj.write(filename)
+        os.remove(filename)
+    zipObj.close()
