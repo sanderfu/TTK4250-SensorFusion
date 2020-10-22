@@ -108,7 +108,7 @@ z_gyroscope = loaded_data["zGyro"].T
 
 
 dt = np.mean(np.diff(timeIMU))
-steps = 1000# len(z_acceleration)
+steps = len(z_acceleration)
 gnss_steps = len(z_GNSS)
 
 # %% Measurement noise
@@ -191,13 +191,14 @@ N: int = steps # TODO: choose a small value to begin with (500?), and gradually 
 doGNSS: bool = True # TODO: Set this to False if you want to check that the predictions make sense over reasonable time lenghts
 
 GNSSk: int = 0  # keep track of current step in GNSS measurements
-for k in range(N):
+for k in tqdm(range(N)):
     if doGNSS and timeIMU[k] >= timeGNSS[GNSSk]:
 
         x_est[k,:], P_est[k] = eskf.update_GNSS_position(x_pred[k], P_pred[k], z_GNSS[GNSSk], R_GNSS, lever_arm)
         NIS[GNSSk] = eskf.NIS_GNSS_position(x_est[k],P_est[k], z_GNSS[GNSSk], R_GNSS, lever_arm)
-
-        assert np.all(np.isfinite(P_est[k])), f"Not finite P_pred at index {k}"
+        
+        if eskf.debug:
+            assert np.all(np.isfinite(P_est[k])), f"Not finite P_pred at index {k}"
         
         GNSSk += 1
     else:
