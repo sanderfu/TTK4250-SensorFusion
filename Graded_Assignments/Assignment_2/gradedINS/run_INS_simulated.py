@@ -111,18 +111,18 @@ z_gyroscope = loaded_data["zGyro"].T
 
 dt = np.mean(np.diff(timeIMU))
 steps = len(z_acceleration)
+steps = 50000
 gnss_steps = len(z_GNSS)
 
 # %% Measurement noise
 # IMU noise values for STIM300, based on datasheet and simulation sample rate
 # Continous noise
-# TODO: What to remove here?
-cont_gyro_noise_std = 4.36e-5  # (rad/s)/sqrt(Hz)
-cont_acc_noise_std = 1.167e-3  # (m/s**2)/sqrt(Hz)
+discrete_gyro_noise_std = 4.36e-5  # (rad/s)/sqrt(Hz)
+discrete_acc_noise_std = 1.167e-3  # (m/s**2)/sqrt(Hz)
 
-# Discrete sample noise at simulation rate used
-rate_std = 0.5 * cont_gyro_noise_std * np.sqrt(1 / dt)
-acc_std = 0.5 * cont_acc_noise_std * np.sqrt(1 / dt)
+#Based on eq. 10.70
+cont_gyro_noise_std = discrete_gyro_noise_std * np.sqrt(1/dt) # (rad/s)
+cont_acc_noise_std = discrete_acc_noise_std * np.sqrt(1/dt)  # (m/s**2)
 
 # Bias values
 rate_bias_driving_noise_std = 5e-5
@@ -143,8 +143,8 @@ p_gyro = 1e-16
 
 # %% Estimator
 eskf = ESKF(
-    acc_std,
-    rate_std,
+    cont_acc_noise_std,
+    cont_gyro_noise_std,
     cont_acc_bias_driving_noise_std,
     cont_rate_bias_driving_noise_std,
     p_acc,
