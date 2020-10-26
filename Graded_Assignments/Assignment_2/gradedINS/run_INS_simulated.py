@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import eskf
 
-save_results = False
+save_results = True
 
 try: # see if tqdm is available, otherwise define it as a dummy
     try: # Ipython seem to require different tqdm.. try..except seem to be the easiest way to check
@@ -111,7 +111,6 @@ z_gyroscope = loaded_data["zGyro"].T
 
 dt = np.mean(np.diff(timeIMU))
 steps = len(z_acceleration)
-steps = 50000
 gnss_steps = len(z_GNSS)
 
 # %% Measurement noise
@@ -125,7 +124,7 @@ cont_gyro_noise_std = discrete_gyro_noise_std * np.sqrt(1/dt) # (rad/s)
 cont_acc_noise_std = discrete_acc_noise_std * np.sqrt(1/dt)  # (m/s**2)
 
 # Bias values
-rate_bias_driving_noise_std = 5e-5
+rate_bias_driving_noise_std = 5e-5*4
 cont_rate_bias_driving_noise_std = (
     (1 / 3) * rate_bias_driving_noise_std / np.sqrt(1 / dt)
 )
@@ -134,12 +133,12 @@ acc_bias_driving_noise_std = 4e-3
 cont_acc_bias_driving_noise_std = 6 * acc_bias_driving_noise_std / np.sqrt(1 / dt)
 
 # Position and velocity measurement
-p_std = 0.2*np.array([1, 1, 10])  # Measurement noise
+p_std = 0.2*np.array([1, 1, 2.5])  # Measurement noise
 R_GNSS = np.diag(p_std ** 2)
 
 p_acc = 1e-16
 
-p_gyro = 1e-16
+p_gyro = 1e-8
 
 # %% Estimator
 eskf = ESKF(
