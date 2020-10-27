@@ -243,15 +243,17 @@ ANEES_accbias = np.mean(NEES_accbias)
 ANEES_gyrobias = np.mean(NEES_gyrobias)
 
 ANIS = np.mean(NIS)
-
-print(f"ANEES_all = {ANEES_all:.2f} with CI = [{CI15K[0]:.2f}, {CI15K[1]:.2f}]")
-print(f"ANEES_pos = {ANEES_pos:.2f} with CI = [{CI3K[0]:.2f}, {CI3K[1]:.2f}]")
-print(f"ANEES_vel = {ANEES_vel:.2f} with CI = [{CI3K[0]:.2f}, {CI3K[1]:.2f}]")
-print(f"ANEES_att = {ANEES_att:.2f} with CI = [{CI3K[0]:.2f}, {CI3K[1]:.2f}]")
-print(f"ANEES_accbias = {ANEES_accbias:.2f} with CI = [{CI3K[0]:.2f}, {CI3K[1]:.2f}]")
-print(f"ANEES_gryobias = {ANEES_gyrobias:.2f} with CI = [{CI3K[0]:.2f}, {CI3K[1]:.2f}]")
-
-print(f"ANIS = {ANIS:.2f} with CI = [{CI3K[0]:.2f}, {CI3K[1]:.2f}]")
+ANEES_and_ANIS_results = [
+    f"ANEES_all = {ANEES_all:.2f} with CI = [{CI15K[0]:.2f}, {CI15K[1]:.2f}]\n",
+    f"ANEES_pos = {ANEES_pos:.2f} with CI = [{CI3K[0]:.2f}, {CI3K[1]:.2f}]\n",
+    f"ANEES_vel = {ANEES_vel:.2f} with CI = [{CI3K[0]:.2f}, {CI3K[1]:.2f}]\n",
+    f"ANEES_att = {ANEES_att:.2f} with CI = [{CI3K[0]:.2f}, {CI3K[1]:.2f}]\n",
+    f"ANEES_accbias = {ANEES_accbias:.2f} with CI = [{CI3K[0]:.2f}, {CI3K[1]:.2f}]\n",
+    f"ANEES_gryobias = {ANEES_gyrobias:.2f} with CI = [{CI3K[0]:.2f}, {CI3K[1]:.2f}]\n",
+    f"ANIS = {ANIS:.2f} with CI = [{CI3K[0]:.2f}, {CI3K[1]:.2f}]\n"
+]
+for line in ANEES_and_ANIS_results:
+    print(line)
 
 # %% Plots
 
@@ -482,8 +484,10 @@ if save_results:
         zipObj.write(filename)
         os.remove(filename)
     #Save ANEES and ANIS in txt
-
-
+    with open("ANEES_and_ANIS.txt","w+") as file:
+        file.writelines(ANEES_and_ANIS_results)
+    zipObj.write("ANEES_and_ANIS.txt")
+    os.remove("ANEES_and_ANIS.txt")
     zipObj.close()
 
 plt.show()
