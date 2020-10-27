@@ -215,21 +215,6 @@ for k in tqdm(range(N)):
 
     if doGNSS and timeIMU[k] >= timeGNSS[GNSSk]:
 
-        # if stationary:
-        #     if GNSSk>0 and abs(la.norm(z_GNSS[GNSSk])-la.norm(z_GNSS[GNSSk-1])>diff_to_change):
-        #         stationary=False
-        #         x_pred[k,POS_IDX]=z_GNSS[GNSSk]
-        #         P_pred[k][POS_IDX**2]=RGNSS(GNSSk)
-        #         GNSSk_start_moving = GNSSk
-        #         k_start_moving = k
-        #         print(x_pred[k])
-        #         print("Leaving stationary state, starting ESKF, k=",k," GNSSk=",GNSSk)
-        #     else:
-        #         x_pred[k+1]=x_pred[k]
-        #         P_pred[k+1]=P_pred[k]
-        #         print("Staying in stationary state, k=",k)
-        #         GNSSk += 1
-        #         continue
         x_est[k,:], P_est[k] = eskf.update_GNSS_position(x_pred[k], P_pred[k], z_GNSS[GNSSk], RGNSS(GNSSk), lever_arm)
         nis_thread = threading.Thread(target=nis_calculations, args=(x_est[k],P_est[k], z_GNSS[GNSSk], GNSSk,RGNSS(GNSSk)))
         nis_thread.start()
@@ -242,12 +227,7 @@ for k in tqdm(range(N)):
 
         GNSSk += 1
     else:
-
-        # if stationary:
-        #     x_pred[k+1]=x_pred[k]
-        #     P_pred[k+1]=P_pred[k]
-        #     continue
-        # no updates, so let us take estimate = prediction
+        # no updates, take estimate = prediction
         x_est[k,:] = x_pred[k,:] #Done
         P_est[k] = P_pred[k]
 

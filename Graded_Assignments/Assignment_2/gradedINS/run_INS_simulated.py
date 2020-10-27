@@ -115,9 +115,10 @@ gnss_steps = len(z_GNSS)
 
 # %% Measurement noise
 # IMU noise values for STIM300, based on datasheet and simulation sample rate
-# Continous noise
-discrete_gyro_noise_std = 4.36e-5  # (rad/s)/sqrt(Hz)
-discrete_acc_noise_std = 1.167e-3  # (m/s**2)/sqrt(Hz)
+# Discrete noise
+scaling = 1.25
+discrete_gyro_noise_std = scaling*4.36e-5  # (rad/s)/sqrt(Hz)
+discrete_acc_noise_std = scaling*1.167e-3  # (m/s**2)/sqrt(Hz)
 
 #Eq 10.70
 cont_gyro_noise_std = discrete_gyro_noise_std * np.sqrt(1/dt) # (rad/s)
@@ -189,6 +190,10 @@ N: int = steps
 doGNSS: bool = True
 
 GNSSk: int = 0  # keep track of current step in GNSS measurements
+
+nees_threads = []
+
+
 for k in tqdm(range(N)):
     if doGNSS and timeIMU[k] >= timeGNSS[GNSSk]:
 
@@ -220,6 +225,33 @@ for k in tqdm(range(N)):
     if eskf.debug:
         assert np.all(np.isfinite(P_pred[k])), f"Not finite P_pred at index {k + 1}"
 
+
+
+# %% Calculating ANEES
+confprob = 0.95
+CI15 = np.array(scipy.stats.chi2.interval(confprob, 15)).reshape((2, 1))
+CI3 = np.array(scipy.stats.chi2.interval(confprob, 3)).reshape((2, 1))
+
+CI15K = np.array(scipy.stats.chi2.interval(confprob, 15 * steps)) / steps
+CI3K = np.array(scipy.stats.chi2.interval(confprob, 3 * steps)) / steps
+
+ANEES_all = np.mean(NEES_all)
+ANEES_pos = np.mean(NEES_pos)
+ANEES_vel = np.mean(NEES_vel)
+ANEES_att = np.mean(NEES_att)
+ANEES_accbias = np.mean(NEES_accbias)
+ANEES_gyrobias = np.mean(NEES_gyrobias)
+
+ANIS = np.mean(NIS)
+
+print(f"ANEES_all = {ANEES_all:.2f} with CI = [{CI15K[0]:.2f}, {CI15K[1]:.2f}]")
+print(f"ANEES_pos = {ANEES_pos:.2f} with CI = [{CI3K[0]:.2f}, {CI3K[1]:.2f}]")
+print(f"ANEES_vel = {ANEES_vel:.2f} with CI = [{CI3K[0]:.2f}, {CI3K[1]:.2f}]")
+print(f"ANEES_att = {ANEES_att:.2f} with CI = [{CI3K[0]:.2f}, {CI3K[1]:.2f}]")
+print(f"ANEES_accbias = {ANEES_accbias:.2f} with CI = [{CI3K[0]:.2f}, {CI3K[1]:.2f}]")
+print(f"ANEES_gryobias = {ANEES_gyrobias:.2f} with CI = [{CI3K[0]:.2f}, {CI3K[1]:.2f}]")
+
+print(f"ANIS = {ANIS:.2f} with CI = [{CI3K[0]:.2f}, {CI3K[1]:.2f}]")
 
 # %% Plots
 
@@ -438,36 +470,20 @@ the_time = re.sub(r' ',r'_', the_time)
 print(the_time)
 zipObj = ZipFile(f"test_sim{the_time}.zip", 'w')
 
-
-
-# with open("tuning_parameters.txt", "w+") as f:
-
-#     f.write(f"Steps:{steps}\n")
-#     f.write(f"cont_gyro_noise_std:{cont_gyro_noise_std}\n")
-#     f.write(f"cont_acc_noise_std :{cont_acc_noise_std}\n")
-#     f.write(f"rate_std: {rate_std}\n")
-#     f.write(f"acc_std: {acc_std}\n")
-#     f.write(f"rate_bias_driving_noise_std:{rate_bias_driving_noise_std}\n")
-#     f.write(f"cont_rate_bias_driving_noise_std:{cont_rate_bias_driving_noise_std}\n")
-#     f.write(f"acc_bias_driving_noise_std:{acc_bias_driving_noise_std}\n")
-#     f.write(f"cont_acc_bias_driving_noise_std :{cont_acc_bias_driving_noise_std }\n")
-#     f.write(f"p_std:{p_std}\n")
-#     f.write(f"R_GNSS:{R_GNSS}\n")
-#     f.write(f"p_acc:{p_acc}\n")
-#     f.write(f"p_gyro:{p_gyro}\n")
-#     f.write(f"P_pred[0]:{P_pred[0]}\n")
-#     f.write(f"x_pred[0]:{x_pred[0]}\n")
-
-# zipObj.write("tuning_parameters.txt")
-
 if save_results:
+    #Save runfile
     zipObj.write("run_INS_simulated.py")
+
+    #Save plots as PDF
     for i in plt.get_fignums():
         filename = f"fig_sim{i}{the_time}.pdf"
         plt.figure(i)
         plt.savefig(filename)
         zipObj.write(filename)
         os.remove(filename)
+    #Save ANEES and ANIS in txt
+
+
     zipObj.close()
 
 plt.show()
