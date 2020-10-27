@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.linalg as la
 
-save_results = False
+save_results = True
 
 try: # see if tqdm is available, otherwise define it as a dummy
     try: # Ipython seem to require different tqdm.. try..except seem to be the easiest way to check
@@ -117,6 +117,7 @@ gnss_steps = len(z_GNSS)
 
 # %% Measurement noise
 # Continous noise
+
 discrete_gyro_noise_std = 4.36e-5  # (rad/s)/sqrt(Hz)
 discrete_acc_noise_std = 1.167e-3  # (m/s**2)/sqrt(Hz)
 
@@ -329,10 +330,8 @@ plt.boxplot([NIS[0:GNSSk], gauss_compare], notch=True)
 plt.legend(['NIS', 'gauss'])
 plt.grid()
 
-plt.show()
 
 # %%
-plt.show()
 from zipfile import ZipFile
 import datetime
 import re
@@ -374,3 +373,5 @@ if save_results:
         zipObj.write(filename)
         os.remove(filename)
     zipObj.close()
+
+plt.show()

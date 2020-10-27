@@ -7,7 +7,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import eskf
-
+import threading
 save_results = True
 
 try: # see if tqdm is available, otherwise define it as a dummy
@@ -129,7 +129,7 @@ cont_rate_bias_driving_noise_std = (
     (1 / 3) * rate_bias_driving_noise_std / np.sqrt(1 / dt)
 )
 
-acc_bias_driving_noise_std = 4e-3
+acc_bias_driving_noise_std = 4e-3*4
 cont_acc_bias_driving_noise_std = 6 * acc_bias_driving_noise_std / np.sqrt(1 / dt)
 
 # Position and velocity measurement
@@ -192,12 +192,34 @@ N: int = steps # TODO: choose a small value to begin with (500?), and gradually 
 doGNSS: bool = True # TODO: Set this to False if you want to check that the predictions make sense over reasonable time lenghts
 
 GNSSk: int = 0  # keep track of current step in GNSS measurements
+
+nis_threads = []
+nees_threads = []
+def nis_calculations(x, P, z,  GNSSk, R):
+    NIS[GNSSk] = eskf.NIS_GNSS_position(x, P, z, R, lever_arm)
+    
+def nees_calculations(x, P,x_true, k):
+    delta_x[k] = eskf.delta_x(x, x_true)
+
+    (
+        NEES_all[k],
+        NEES_pos[k],
+        NEES_vel[k],
+        NEES_att[k],
+        NEES_accbias[k],
+        NEES_gyrobias[k],
+    ) = eskf.NEESes(x, P, x_true) 
+
+    
+    
+    
 for k in tqdm(range(N)):
     if doGNSS and timeIMU[k] >= timeGNSS[GNSSk]:
 
         x_est[k,:], P_est[k] = eskf.update_GNSS_position(x_pred[k], P_pred[k], z_GNSS[GNSSk], R_GNSS, lever_arm)
-        NIS[GNSSk] = eskf.NIS_GNSS_position(x_est[k],P_est[k], z_GNSS[GNSSk], R_GNSS, lever_arm)
-
+        nis_thread = threading.Thread(target=nis_calculations, args=(x_est[k],P_est[k], z_GNSS[GNSSk], GNSSk, R_GNSS))
+        nis_thread.start()
+        nis_threads.append(nis_thread)
         if eskf.debug:
             assert np.all(np.isfinite(P_est[k])), f"Not finite P_pred at index {k}"
 
@@ -207,15 +229,10 @@ for k in tqdm(range(N)):
         x_est[k,:] = x_pred[k,:] #Done
         P_est[k] = P_pred[k]
 
-    delta_x[k] = eskf.delta_x(x_est[k], x_true[k])
-    (
-        NEES_all[k],
-        NEES_pos[k],
-        NEES_vel[k],
-        NEES_att[k],
-        NEES_accbias[k],
-        NEES_gyrobias[k],
-    ) = eskf.NEESes(x_est[k,:], P_est[k], x_true[k]) # Done: The true error state at step k
+    nees_thread = threading.Thread(target=nees_calculations, args=(x_est[k,:], P_est[k], x_true[k], k))
+    nees_thread.start()
+    nees_threads.append(nees_thread)
+    
 
     if k < N - 1:
         x_pred[k + 1,:], P_pred[k + 1] = eskf.predict(x_est[k], P_est[k], z_acceleration[k+1], z_gyroscope[k+1], dt)  #Done : Hint: measurements come from the the present and past, not the future
@@ -225,7 +242,8 @@ for k in tqdm(range(N)):
 
 
 # %% Plots
-
+for thr in nees_threads+nis_threads:
+    thr.join()
 fig1 = plt.figure(1)
 ax = plt.axes(projection="3d")
 
@@ -430,7 +448,6 @@ axs6[2].boxplot([NEES_pos[0:N].T, NEES_vel[0:N].T, NEES_att[0:N].T, NEES_accbias
 axs6[2].legend(['NEES pos', 'NEES vel', 'NEES att', 'NEES accbias', 'NEES gyrobias', 'gauss (3 dim)'])
 plt.grid()
 
-plt.show()
 # %%
 from zipfile import ZipFile
 import datetime
@@ -473,3 +490,4 @@ if save_results:
         zipObj.write(filename)
         os.remove(filename)
     zipObj.close()
+plt.show()
