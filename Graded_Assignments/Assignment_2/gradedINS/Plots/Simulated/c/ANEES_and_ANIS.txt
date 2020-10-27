@@ -1,0 +1,7 @@
+ANEES_all = 1560.11 with CI = [14.96, 15.04]
+ANEES_pos = 8.77 with CI = [2.98, 3.02]
+ANEES_vel = 13.85 with CI = [2.98, 3.02]
+ANEES_att = 139.68 with CI = [2.98, 3.02]
+ANEES_accbias = 21.06 with CI = [2.98, 3.02]
+ANEES_gryobias = 805.49 with CI = [2.98, 3.02]
+ANIS = 2.50 with CI = [2.98, 3.02]

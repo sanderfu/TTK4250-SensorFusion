@@ -97,6 +97,7 @@ except Exception as e:
             #Subplots and figure
             "figure.figsize" : [8,7],
             "figure.subplot.wspace" : 0.37,
+            "figure.subplot.hspace" : 0.03,
             "figure.subplot.top" : 0.95,
             "figure.subplot.right" : 0.95,
             "figure.subplot.left" : 0.16,
@@ -454,9 +455,6 @@ axs5[6].set(
     title=f"NIS ({100 *  insideCI:.1f} inside {100 * confprob} confidence interval)"
 )
 axs5[6].set_ylim([0, 20])
-#for i in range(0,7):
-#    axs5[i].set_yticklabels([])
-#    axs5[i].set_xticklabels([])
 
 # boxplot
 fig6, axs6 = plt.subplots(1, 3)

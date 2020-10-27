@@ -82,12 +82,23 @@ except Exception as e:
             "grid.linestyle": ":",
             "grid.color": "k",
             "grid.alpha": 0.5,
-            "grid.linewidth": 0.5,
+            "grid.linewidth": 1,
             # Legend
             "legend.frameon": True,
             "legend.framealpha": 1.0,
             "legend.fancybox": True,
             "legend.numpoints": 1,
+            "legend.loc" : "upper right",
+            'legend.fontsize': 10,
+            # Font
+            "font.size" : 15,
+            #Subplots and figure
+            "figure.figsize" : [8,7],
+            "figure.subplot.wspace" : 0.37,
+            "figure.subplot.hspace" : 0.34,
+            "figure.subplot.top" : 0.95,
+            "figure.subplot.right" : 0.95,
+            "figure.subplot.left" : 0.18,
         }
     )
 
@@ -238,16 +249,6 @@ for k in tqdm(range(N)):
 
 
 # %% Plots
-for thr in nis_threads:
-    thr.join()
-    
-    
-ANIS = np.mean(NIS)
-ANIS_results = [
-    f"ANIS = {ANIS:.2f} with CI = [{CI3K[0]:.2f}, {CI3K[1]:.2f}]\n"
-]
-for line in ANEES_and_ANIS_results:
-    print(line)
 fig1 = plt.figure(1)
 ax = plt.axes(projection='3d')
 
@@ -266,27 +267,27 @@ eul = np.apply_along_axis(quaternion_to_euler, 1, x_est[:N, ATT_IDX])
 fig2, axs2 = plt.subplots(5, 1)
 
 axs2[0].plot(t, x_est[0:N, POS_IDX])
-axs2[0].set(ylabel='NED position [m]')
+axs2[0].set(ylabel='NED [m]')
 axs2[0].legend(['North', 'East', 'Down'])
 plt.grid()
 
 axs2[1].plot(t, x_est[0:N, VEL_IDX])
-axs2[1].set(ylabel='Velocities [m/s]')
+axs2[1].set(ylabel='Vel. [m/s]')
 axs2[1].legend(['North', 'East', 'Down'])
 plt.grid()
 
 axs2[2].plot(t, eul[0:N] * 180 / np.pi)
-axs2[2].set(ylabel='Euler angles [deg]')
+axs2[2].set(ylabel='Euler a.\n [deg]')
 axs2[2].legend(['\phi', '\theta', '\psi'])
 plt.grid()
 
 axs2[3].plot(t, x_est[0:N, ACC_BIAS_IDX])
-axs2[3].set(ylabel='Accl bias [m/s^2]')
+axs2[3].set(ylabel='Accl bias\n [m/s^2]')
 axs2[3].legend(['x', 'y', 'z'])
 plt.grid()
 
 axs2[4].plot(t, x_est[0:N, GYRO_BIAS_IDX] * 180 / np.pi * 3600)
-axs2[4].set(ylabel='Gyro bias [deg/h]')
+axs2[4].set(ylabel='Gyro bias\n [deg/h]')
 axs2[4].legend(['x', 'y', 'z'])
 plt.grid()
 
@@ -315,10 +316,7 @@ plt.boxplot([NIS[0:GNSSk], gauss_compare], notch=True)
 plt.legend(['NIS', 'gauss'])
 plt.grid()
 
-plt.show()
-
 # %%
-plt.show()
 from zipfile import ZipFile
 import datetime
 import re
@@ -327,31 +325,9 @@ the_time = str(datetime.datetime.now())
 the_time = re.sub(r':',r';', the_time)
 the_time = re.sub(r' ',r'_', the_time)
 print(the_time)
-zipObj = ZipFile(f"test_real{the_time}.zip", 'w')
-
-
-
-# with open("tuning_parameters.txt", "w+") as f:
-
-#     f.write(f"Steps:{steps}\n")
-#     f.write(f"cont_gyro_noise_std:{cont_gyro_noise_std}\n")
-#     f.write(f"cont_acc_noise_std :{cont_acc_noise_std}\n")
-#     f.write(f"rate_std: {rate_std}\n")
-#     f.write(f"acc_std: {acc_std}\n")
-#     f.write(f"rate_bias_driving_noise_std:{rate_bias_driving_noise_std}\n")
-#     f.write(f"cont_rate_bias_driving_noise_std:{cont_rate_bias_driving_noise_std}\n")
-#     f.write(f"acc_bias_driving_noise_std:{acc_bias_driving_noise_std}\n")
-#     f.write(f"cont_acc_bias_driving_noise_std :{cont_acc_bias_driving_noise_std }\n")
-#     f.write(f"p_std:{p_std}\n")
-#     f.write(f"R_GNSS:{R_GNSS}\n")
-#     f.write(f"p_acc:{p_acc}\n")
-#     f.write(f"p_gyro:{p_gyro}\n")
-#     f.write(f"P_pred[0]:{P_pred[0]}\n")
-#     f.write(f"x_pred[0]:{x_pred[0]}\n")
-
-# zipObj.write("tuning_parameters.txt")
 
 if save_results:
+    zipObj = ZipFile(f"test_real{the_time}.zip", 'w')
     zipObj.write("run_INS_real.py")
     for i in plt.get_fignums():
         filename = f"fig_real{i}{the_time}.pdf"
@@ -360,3 +336,4 @@ if save_results:
         zipObj.write(filename)
         os.remove(filename)
     zipObj.close()
+plt.show()
