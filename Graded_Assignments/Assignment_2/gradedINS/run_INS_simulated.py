@@ -119,17 +119,17 @@ gnss_steps = len(z_GNSS)
 discrete_gyro_noise_std = 4.36e-5  # (rad/s)/sqrt(Hz)
 discrete_acc_noise_std = 1.167e-3  # (m/s**2)/sqrt(Hz)
 
-#Based on eq. 10.70
+#Eq 10.70
 cont_gyro_noise_std = discrete_gyro_noise_std * np.sqrt(1/dt) # (rad/s)
 cont_acc_noise_std = discrete_acc_noise_std * np.sqrt(1/dt)  # (m/s**2)
 
 # Bias values
-rate_bias_driving_noise_std = 5e-5*4
+rate_bias_driving_noise_std = 4*5e-5
 cont_rate_bias_driving_noise_std = (
     (1 / 3) * rate_bias_driving_noise_std / np.sqrt(1 / dt)
 )
 
-acc_bias_driving_noise_std = 4e-3
+acc_bias_driving_noise_std = 1.5*4e-3
 cont_acc_bias_driving_noise_std = 6 * acc_bias_driving_noise_std / np.sqrt(1 / dt)
 
 # Position and velocity measurement
@@ -183,13 +183,10 @@ P_pred[0][ERR_ATT_IDX ** 2] = ((np.pi/30)**2)*np.eye(3)# TODO # error rotation v
 P_pred[0][ERR_ACC_BIAS_IDX ** 2] = 1e-2*np.eye(3)# TODO
 P_pred[0][ERR_GYRO_BIAS_IDX ** 2] = 1e-6*np.eye(3)# TODO
 
-# %% Test: you can run this cell to test your implementation
-#dummy = eskf.predict(x_pred[0], P_pred[0], z_acceleration[0], z_gyroscope[0], dt)
-#dummy = eskf.update_GNSS_position(x_pred[0], P_pred[0], z_GNSS[0], R_GNSS, lever_arm)
 # %% Run estimation
 # run this file with 'python -O run_INS_simulated.py' to turn of assertions and get about 8/5 speed increase for longer runs
-N: int = steps # TODO: choose a small value to begin with (500?), and gradually increase as you OK results
-doGNSS: bool = True # TODO: Set this to False if you want to check that the predictions make sense over reasonable time lenghts
+N: int = steps
+doGNSS: bool = True
 
 GNSSk: int = 0  # keep track of current step in GNSS measurements
 for k in tqdm(range(N)):
@@ -430,7 +427,6 @@ axs6[2].boxplot([NEES_pos[0:N].T, NEES_vel[0:N].T, NEES_att[0:N].T, NEES_accbias
 axs6[2].legend(['NEES pos', 'NEES vel', 'NEES att', 'NEES accbias', 'NEES gyrobias', 'gauss (3 dim)'])
 plt.grid()
 
-plt.show()
 # %%
 from zipfile import ZipFile
 import datetime
@@ -473,3 +469,5 @@ if save_results:
         zipObj.write(filename)
         os.remove(filename)
     zipObj.close()
+
+plt.show()

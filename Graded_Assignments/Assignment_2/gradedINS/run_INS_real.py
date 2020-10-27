@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.linalg as la
 
-save_results = False
+save_results = True
 
 try: # see if tqdm is available, otherwise define it as a dummy
     try: # Ipython seem to require different tqdm.. try..except seem to be the easiest way to check
@@ -113,12 +113,13 @@ accuracy_GNSS = loaded_data['GNSSaccuracy'].ravel()
 
 dt = np.mean(np.diff(timeIMU))
 steps = len(z_acceleration)
+steps = 400000
 gnss_steps = len(z_GNSS)
 
 # %% Measurement noise
 # Continous noise
-discrete_gyro_noise_std = 4.36e-5  # (rad/s)/sqrt(Hz)
-discrete_acc_noise_std = 1.167e-3  # (m/s**2)/sqrt(Hz)
+discrete_gyro_noise_std = 1.3*4.36e-5  # (rad/s)/sqrt(Hz)
+discrete_acc_noise_std = 1.3*1.167e-3  # (m/s**2)/sqrt(Hz)
 
 #Based on eq. 10.70
 cont_gyro_noise_std = discrete_gyro_noise_std * np.sqrt(1/dt) # (rad/s)
@@ -185,10 +186,8 @@ P_pred[0][ERR_ACC_BIAS_IDX**2] = 0.02**2 *np.eye(3)
 P_pred[0][ERR_GYRO_BIAS_IDX**2] = (1e-4)**2 * np.eye(3)
 
 # %% Run estimation
-
-
-N: int = steps # TODO: choose a small value to begin with (500?), and gradually increase as you OK results
-doGNSS: bool = True # TODO: Set this to False if you want to check that the predictions make sense over reasonable time lenghts
+N=steps
+doGNSS: bool = True
 
 GNSSk: int = 0  # keep track of current step in GNSS measurements
 
