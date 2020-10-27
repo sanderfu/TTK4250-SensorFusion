@@ -113,42 +113,43 @@ accuracy_GNSS = loaded_data['GNSSaccuracy'].ravel()
 
 dt = np.mean(np.diff(timeIMU))
 steps = len(z_acceleration)
-steps = 5000
+steps = 400000
 gnss_steps = len(z_GNSS)
 
 # %% Measurement noise
 # Continous noise
-cont_gyro_noise_std = 2.5e-3  # (rad/s)/sqrt(Hz)
-cont_acc_noise_std = 1.167e-3  # (m/s**2)/sqrt(Hz)
+discrete_gyro_noise_std = 4.36e-5  # (rad/s)/sqrt(Hz)
+discrete_acc_noise_std = 1.167e-3  # (m/s**2)/sqrt(Hz)
 
-# Discrete sample noise at simulation rate used
-rate_std = cont_gyro_noise_std * np.sqrt(1 / dt)
-acc_std = cont_acc_noise_std * np.sqrt(1 / dt)
+#Based on eq. 10.70
+cont_gyro_noise_std = discrete_gyro_noise_std * np.sqrt(1/dt) # (rad/s)
+cont_acc_noise_std = discrete_acc_noise_std * np.sqrt(1/dt)  # (m/s**2)
 
 # Bias values
-#rate_bias_driving_noise_std = 5e-5
-cont_rate_bias_driving_noise_std = 2.2e-3
+rate_bias_driving_noise_std = 5e-5*4
+cont_rate_bias_driving_noise_std = (
+    (1 / 3) * rate_bias_driving_noise_std / np.sqrt(1 / dt)
+)
 
-#acc_bias_driving_noise_std = 4e-3
-cont_acc_bias_driving_noise_std = 1.2e-5
+acc_bias_driving_noise_std = 4e-3
+cont_acc_bias_driving_noise_std = 6 * acc_bias_driving_noise_std / np.sqrt(1 / dt)
 
 # Position and velocity measurement
-p_std = np.array([(np.mean(accuracy_GNSS))]*3)  # Measurement noise
-#R_GNSS = np.diag(p_std ** 2)
+p_std = 0.2*np.array([1, 1, 2.5])  # Measurement noise
+R_GNSS = np.diag(p_std ** 2)
+
+p_acc = 1e-16
+
+p_gyro = 1e-8
 
 def RGNSS(GNSSk):
-    return np.diag(((0.3**2)*accuracy_GNSS[GNSSk]**2)*np.array([0.9**2,0.9**2, 5**2]))
+    return (accuracy_GNSS[GNSSk]**2)/np.mean(accuracy_GNSS)*R_GNSS
 
-
-# Position and velocity measurement
-p_acc = 1e-3
-
-p_gyro = 1e-3
 
 # %% Estimator
 eskf = ESKF(
-    acc_std,
-    rate_std,
+    cont_acc_noise_std,
+    cont_gyro_noise_std,
     cont_acc_bias_driving_noise_std,
     cont_rate_bias_driving_noise_std,
     p_acc,
@@ -207,8 +208,7 @@ format = "%(asctime)s: %(message)s"
 logging.basicConfig(format=format, level=logging.INFO, datefmt="%H:%M:%S")
 
 nis_threads = []
-def nis_calculations(x, P, z, GNSSk):
-    R = RGNSS(GNSSk)
+def nis_calculations(x, P, z, GNSSk,R):
     NIS[GNSSk] = eskf.NIS_GNSS_position(x, P, z, R, lever_arm)
     NIS_planar[GNSSk] = eskf.NIS_Planar(x, P, z, R, lever_arm)
     NIS_altitude[GNSSk] = eskf.NIS_Altitude(x, P, z, R, lever_arm)
@@ -234,9 +234,10 @@ for k in tqdm(range(N)):
         #         GNSSk += 1
         #         continue
         x_est[k,:], P_est[k] = eskf.update_GNSS_position(x_pred[k], P_pred[k], z_GNSS[GNSSk], RGNSS(GNSSk), lever_arm)
-        nis_thread = threading.Thread(target=nis_calculations, args=(x_est[k],P_est[k], z_GNSS[GNSSk], GNSSk))
+        nis_thread = threading.Thread(target=nis_calculations, args=(x_est[k],P_est[k], z_GNSS[GNSSk], GNSSk,RGNSS(GNSSk)))
         nis_thread.start()
         nis_threads.append(nis_thread)
+
 
 
         if eskf.debug:
