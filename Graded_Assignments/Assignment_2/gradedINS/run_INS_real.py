@@ -113,7 +113,6 @@ accuracy_GNSS = loaded_data['GNSSaccuracy'].ravel()
 
 dt = np.mean(np.diff(timeIMU))
 steps = len(z_acceleration)
-steps = 400000
 gnss_steps = len(z_GNSS)
 
 # %% Measurement noise
@@ -141,9 +140,8 @@ R_GNSS = np.diag(p_std ** 2)
 p_acc = 1e-16
 
 p_gyro = 1e-8
-
 def RGNSS(GNSSk):
-    return (accuracy_GNSS[GNSSk]**2)/np.mean(accuracy_GNSS)*R_GNSS
+    return (accuracy_GNSS[GNSSk]**2)*R_GNSS*np.array([0.005, 0.005, 0.015])
 
 
 # %% Estimator
