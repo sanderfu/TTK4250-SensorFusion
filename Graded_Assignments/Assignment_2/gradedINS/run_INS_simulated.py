@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import eskf
 
+#Flag, used to save runfile, all figures, ANEESes and ANIS to zip file.
 save_results = True
 
 try: # see if tqdm is available, otherwise define it as a dummy
@@ -44,8 +45,6 @@ from quaternion import quaternion_to_euler
 from cat_slice import CatSlice
 
 # %% plot config check and style setup
-
-
 # to see your plot config
 print(f"matplotlib backend: {matplotlib.get_backend()}")
 print(f"matplotlib config file: {matplotlib.matplotlib_fname()}")
