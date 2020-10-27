@@ -325,7 +325,7 @@ axs3[1].legend(
 
 # quick wrap func
 wrap_to_pi = lambda rads: (rads + np.pi) % (2 * np.pi) - np.pi
-eul_error = wrap_to_pi(eul[:N] - eul_true[:N]) * 180 / np.pi
+eul_error = wrap_to_pi(eul[:N] - eul_true[:N])
 axs3[2].plot(t, eul_error)
 axs3[2].set(ylabel="Euler angles error [deg]")
 axs3[2].legend(
@@ -340,9 +340,9 @@ axs3[3].plot(t, delta_x[:N, ERR_ACC_BIAS_IDX])
 axs3[3].set(ylabel="Accl bias error [m/s^2]")
 axs3[3].legend(
     [
-        f"$x$ ({np.sqrt(np.mean(delta_x[:N, 12]**2))})",
-        f"$y$ ({np.sqrt(np.mean(delta_x[:N, 13]**2))})",
-        f"$z$ ({np.sqrt(np.mean(delta_x[:N, 14]**2))})",
+        f"$x$ ({np.sqrt(np.mean(delta_x[:N, 9]**2))})",
+        f"$y$ ({np.sqrt(np.mean(delta_x[:N, 10]**2))})",
+        f"$z$ ({np.sqrt(np.mean(delta_x[:N, 11]**2))})",
     ]
 )
 
@@ -376,7 +376,7 @@ axs4[0].legend(
 
 axs4[1].plot(t, np.linalg.norm(delta_x[:N, VEL_IDX], axis=1))
 axs4[1].set(ylabel="Speed error [m/s]")
-axs4[1].legend([f"RMSE: {np.sqrt(np.mean(np.sum(delta_x[:N, VEL_IDX]**2, axis=0)))}"])
+axs4[1].legend([f"RMSE: {np.sqrt(np.mean(np.sum(delta_x[:N, VEL_IDX]**2, axis=1)))}"])
 
 
 # %% Consistency

@@ -113,7 +113,6 @@ accuracy_GNSS = loaded_data['GNSSaccuracy'].ravel()
 
 dt = np.mean(np.diff(timeIMU))
 steps = len(z_acceleration)
-steps = 400000
 gnss_steps = len(z_GNSS)
 
 # %% Measurement noise
@@ -171,8 +170,8 @@ NIS_planar = np.zeros(gnss_steps)
 NIS_altitude = np.zeros(gnss_steps)
 
 # %% Initialise
-x_pred[0, POS_IDX] = np.array([0, 0, 0]) # starting 5 metres above ground
-x_pred[0, VEL_IDX] = np.array([0, 0, 0]) # starting at 20 m/s due north
+x_pred[0, POS_IDX] = np.array([0, 0, 0]) # starting 0 metres above ground
+x_pred[0, VEL_IDX] = np.array([0, 0, 0]) # starting 0 velocity
 x_pred[0, ATT_IDX] = np.array([
     np.cos(45 * np.pi / 180),
     0, 0,
@@ -241,6 +240,14 @@ for k in tqdm(range(N)):
 # %% Plots
 for thr in nis_threads:
     thr.join()
+    
+    
+ANIS = np.mean(NIS)
+ANIS_results = [
+    f"ANIS = {ANIS:.2f} with CI = [{CI3K[0]:.2f}, {CI3K[1]:.2f}]\n"
+]
+for line in ANEES_and_ANIS_results:
+    print(line)
 fig1 = plt.figure(1)
 ax = plt.axes(projection='3d')
 
