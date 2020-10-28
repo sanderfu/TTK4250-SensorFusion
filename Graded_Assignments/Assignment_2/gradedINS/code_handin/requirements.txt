@@ -1,0 +1,6 @@
+ipdb
+numpy
+scipy
+matplotlib
+tqdm
+
