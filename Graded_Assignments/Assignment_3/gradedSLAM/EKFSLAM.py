@@ -180,16 +180,18 @@ class EKFSLAM:
         m = eta[3:].reshape((-1, 2)).T
 
         Rot = rotmat2d(-x[2])
-
+        
         # None as index ads an axis with size 1 at that position.
         # Numpy broadcasts size 1 dimensions to any size when needed
-        delta_m = # TODO, relative position of landmark to sensor on robot in world frame
+        delta_m = m - x[:2] - Rot@self.sensor_offset # Done, relative position of landmark to sensor on robot in world frame
 
-        zpredcart = # TODO, predicted measurements in cartesian coordinates, beware sensor offset for VP
+            
 
-        zpred_r = # TODO, ranges
-        zpred_theta = # TODO, bearings
-        zpred = # TODO, the two arrays above stacked on top of each other vertically like 
+        zpredcart = np.array([Rot@delta_m[:, j] for j in range(np.shape(m)[1]])# TODO, predicted measurements in cartesian coordinates, beware sensor offset for VP
+
+        zpred_r = np.sqrt(zpredcart[0, :]**2 + zpredcart[1,:]**2)# TODO, ranges
+        zpred_theta = np.atan2(zpredcart[1,:], zpredcart[0, :])= # TODO, bearings
+        zpred = np.vstack(zpred_r, zpred_theta) # Done, the two arrays above stacked on top of each other vertically like 
         # [ranges; 
         #  bearings]
         # into shape (2, #lmrk)
@@ -223,19 +225,20 @@ class EKFSLAM:
 
         Rot = rotmat2d(x[2])
 
-        delta_m = # TODO, relative position of landmark to robot in world frame. m - rho that appears in (11.15) and (11.16)
+        delta_m = m - x[:2]  # TODO, relative position of landmark to robot in world frame. m - rho that appears in (11.15) and (11.16)
 
-        zc = # TODO, (2, #measurements), each measured position in cartesian coordinates like
+        zc = delta_m - Rot@self.sensor_offset# TODO, (2, #measurements), each measured position in cartesian coordinates like
         # [x coordinates;
         #  y coordinates]
-
-        zpred = # TODO (2, #measurements), predicted measurements, like
-        # [ranges;
-        #  bearings]
-        zr = # TODO, ranges
-
         Rpihalf = rotmat2d(np.pi / 2)
 
+
+        # [ranges;
+        #  bearings]
+        zranges = zc.T/la.norm(zc, 2)@np.array([-np.eye(2), -Rpihalf@delta_m])
+        zbearings = zc.T@Rpihalf.T/la.norm(zc, 2)**2 @ np.array([-np.eye(2), -Rpihalf@delta_m])
+
+        zpred = np.vstack((zranges, zbearings))# Done (2, #measurements), predicted measurements, like
         # In what follows you can be clever and avoid making this for all the landmarks you _know_
         # you will not detect (the maximum range should be available from the data).
         # But keep it simple to begin with.
