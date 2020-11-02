@@ -44,7 +44,14 @@ class EKFSLAM:
         np.ndarray, shape = (3,)
             the predicted state
         """
-        xpred = # TODO, eq (11.7). Should wrap heading angle between (-pi, pi), see utils.wrapToPi
+        x_prev = x[0]
+        y_prev = x[1]
+        psi_prev = x[2]
+        
+        x = x_prev + u[0]*np.cos(psi_prev) - u[1]*np.sin(psi_prev)
+        y = y_prev + u[0]*np.sin(psi_prev) + u[1]*np.cos(psi_prev)
+        psi = wrapToPi(psi_prev + u[2])
+        xpred = np.array([x,y,psi]) # TODO, eq (11.7). Should wrap heading angle between (-pi, pi), see utils.wrapToPi
 
         assert xpred.shape == (3,), "EKFSLAM.f: wrong shape for xpred"
         return xpred
@@ -64,7 +71,12 @@ class EKFSLAM:
         np.ndarray
             The Jacobian of f wrt. x.
         """
-        Fx = # TODO, eq (11.13)
+
+        psi_prev = x[2]
+        row0 = [1 0 -u[0]*np.sin(psi_prev) - u[1]*np.cos(psi_prev)]
+        row1 = [0 1 u[0]*np.cos(psi_prev) - u[1]*sin(psi_prev)]
+        row2 = [0 0 1]
+        Fx = np.vstack((row0, row1, row2))# TODO, eq (11.13)
 
         assert Fx.shape == (3, 3), "EKFSLAM.Fx: wrong shape"
         return Fx
@@ -86,7 +98,7 @@ class EKFSLAM:
         """
         psi_prev = x[2]
         row0 = np.array([np.cos(psi_prev), -np.sin(psi_prev), 0])
-        row1 = np.array([np.sin(psi_prev), np.cos(psi_prev)])
+        row1 = np.array([np.sin(psi_prev), np.cos(psi_prev), 0])
         row2 = np.array([0,0,1])
         Fu = np.vstack((row0,row1,row2)) #eq (11.14)
 
@@ -123,20 +135,22 @@ class EKFSLAM:
         etapred = np.empty_like(eta)
 
         x = eta[:3]
-        etapred[:3] = # TODO robot state prediction
-        etapred[3:] = # TODO landmarks: no effect
+        etapred[:3] = self.f(x, z_odo) # Done robot state prediction
+        etapred[3:] = eta[3:] # Done landmarks: no effect
 
-        Fx = # TODO
-        Fu = # TODO
+        Fx = self.Fx(x, z_odo)# Done
+        Fu = self.Fu(x, z_odo)# Done
 
         # evaluate covariance prediction in place to save computation
         # only robot state changes, so only rows and colums of robot state needs changing
         # cov matrix layout:
         # [[P_xx, P_xm],
         # [P_mx, P_mm]]
-        P[:3, :3] = # TODO robot cov prediction
-        P[:3, 3:] = # TODO robot-map covariance prediction
-        P[3:, :3] = # TODO map-robot covariance: transpose of the above
+        G = np.eye(3)
+        M = (np.shape(eta)[0] - 3)/2.0
+        P[:3, :3] = Fx@P[:3, :3]@Fx.T + G@self.Q@G.T# Done robot cov prediction
+        P[:3, 3:] = Fx@P[:3, 3:]# Done robot-map covariance prediction
+        P[3:, :3] = @P[3:, :3]@Fx.T# Done map-robot covariance: transpose of the above
 
         assert np.allclose(P, P.T), "EKFSLAM.predict: not symmetric P"
         assert np.all(

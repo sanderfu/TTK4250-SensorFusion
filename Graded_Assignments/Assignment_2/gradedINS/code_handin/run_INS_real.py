@@ -131,6 +131,8 @@ accuracy_GNSS = loaded_data['GNSSaccuracy'].ravel()
 
 dt = np.mean(np.diff(timeIMU))
 steps = len(z_acceleration)
+steps = 500
+
 gnss_steps = len(z_GNSS)
 
 # %% Measurement noise
@@ -170,8 +172,8 @@ eskf = ESKF(
     cont_rate_bias_driving_noise_std,
     p_acc,
     p_gyro,
-    S_a = S_a, # set the accelerometer correction matrix
-    S_g = S_g, # set the gyro correction matrix,
+    S_a = np.eye(3), # set the accelerometer correction matrix
+    S_g = np.eye(3), # set the gyro correction matrix,
     debug=False # False to avoid expensive debug checks
 )
 
