@@ -130,6 +130,7 @@ z_gyroscope = loaded_data["zGyro"].T
 accuracy_GNSS = loaded_data['GNSSaccuracy'].ravel()
 
 dt = np.mean(np.diff(timeIMU))
+print(dt*50000)
 steps = len(z_acceleration)
 gnss_steps = len(z_GNSS)
 
@@ -218,7 +219,8 @@ def nis_calculations(x, P, z, GNSSk,R):
     NIS_altitude[GNSSk] = eskf.NIS_Altitude(x, P, z, R, lever_arm)
 
 for k in tqdm(range(N)):
-
+    if k==49000:
+        print(P_pred[k])
 
     if doGNSS and timeIMU[k] >= timeGNSS[GNSSk]:
 
@@ -226,7 +228,6 @@ for k in tqdm(range(N)):
         nis_thread = threading.Thread(target=nis_calculations, args=(x_est[k],P_est[k], z_GNSS[GNSSk], GNSSk,RGNSS(GNSSk)))
         nis_thread.start()
         nis_threads.append(nis_thread)
-
         if eskf.debug:
             assert np.all(np.isfinite(P_est[k])), f"Not finite P_pred at index {k}"
 

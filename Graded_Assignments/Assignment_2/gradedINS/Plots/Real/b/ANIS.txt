@@ -1,0 +1,3 @@
+ANIS = 2.89 with CI = [2.99, 3.01]
+ANIS_planar = 0.84 with CI = [2.99, 3.01]
+ANIS_altitude = 1.07 with CI = [2.99, 3.01]

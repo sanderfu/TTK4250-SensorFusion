@@ -84,7 +84,11 @@ class EKFSLAM:
         np.ndarray
             The Jacobian of f wrt. u.
         """
-        Fu = # TODO, eq (11.14)
+        psi_prev = x[2]
+        row0 = np.array([np.cos(psi_prev), -np.sin(psi_prev), 0])
+        row1 = np.array([np.sin(psi_prev), np.cos(psi_prev)])
+        row2 = np.array([0,0,1])
+        Fu = np.vstack((row0,row1,row2)) #eq (11.14)
 
         assert Fu.shape == (3, 3), "EKFSLAM.Fu: wrong shape"
         return Fu
