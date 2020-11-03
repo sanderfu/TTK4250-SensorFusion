@@ -50,7 +50,7 @@ class EKFSLAM:
         
         x = x_prev + u[0]*np.cos(psi_prev) - u[1]*np.sin(psi_prev)
         y = y_prev + u[0]*np.sin(psi_prev) + u[1]*np.cos(psi_prev)
-        psi = wrapToPi(psi_prev + u[2])
+        psi = utils.wrapToPi(psi_prev + u[2])
         xpred = np.array([x,y,psi]) # TODO, eq (11.7). Should wrap heading angle between (-pi, pi), see utils.wrapToPi
 
         assert xpred.shape == (3,), "EKFSLAM.f: wrong shape for xpred"
@@ -74,7 +74,7 @@ class EKFSLAM:
 
         psi_prev = x[2]
         row0 = np.array([1, 0, -u[0]*np.sin(psi_prev)-u[1]*np.cos(psi_prev)])
-        row1 = np.array([0, 1, u[0]*np.cos(psi_prev)-u[1]*sin(psi_prev)])
+        row1 = np.array([0, 1, u[0]*np.cos(psi_prev)-u[1]*np.sin(psi_prev)])
         row2 = np.array([0, 0, 1])
         Fx = np.vstack((row0, row1, row2))  #DONE, eq (11.13)
 
@@ -320,9 +320,9 @@ class EKFSLAM:
 
         assert len(lmnew) % 2 == 0, "SLAM.add_landmark: lmnew not even length"
         etaadded = np.concatenate((eta, lmnew))# Done, append new landmarks to state vector
-        Padded = la.block_diag(P, Gx@P[:3,:3]@Gx+Rall)# Done, block diagonal of P_new, see problem text in 1g) in graded assignment 3
-        Padded[n:, :n] = P[:,:3]@Gx.T# Done, top right corner of P_new
-        Padded[:n, n:] = Padded[n:, :n].T@Gx# Done, transpose of above. Should yield the same as calcualion, but this enforces symmetry and should be cheaper
+        Padded = la.block_diag(P, Gx@P[:3,:3]@Gx.T+Rall)# Done, block diagonal of P_new, see problem text in 1g) in graded assignment 3
+        Padded[:n, n:] = P[:,:3]@Gx.T# Done, top right corner of P_new
+        Padded[n:, :n] = Gx@P[:3, :]# Done, transpose of above. Should yield the same as calcualion, but this enforces symmetry and should be cheaper
 
         assert (
             etaadded.shape * 2 == Padded.shape
