@@ -295,6 +295,7 @@ class EKFSLAM:
         sensor_offset_world = rotmat2d(eta[2]) @ self.sensor_offset # For transforming landmark position into world frame
         sensor_offset_world_der = rotmat2d(eta[2] + np.pi / 2) @ self.sensor_offset # Used in Gx
 
+        psi = x[2]
         for j in range(numLmk):
             ind = 2 * j
             inds = slice(ind, ind + 2)
@@ -302,12 +303,11 @@ class EKFSLAM:
             zj_r = zj[0]
             zj_b = zj[1]
 
-            psi = x[2]
             rot = rotmat2d(zj_b+psi) # Done, rotmat in Gz
-            lmnew[inds] = rot@zj# Done, calculate position of new landmark in world frame
+            lmnew[inds] = sensor_offset_world@zj# Done, calculate position of new landmark in world frame
 
             Gx[inds, :2] = np.eye(2) # Done
-            Gx[inds, 2] = [np.eye(2) zj_r@np.vstack((-sin(zj_b+psi)) + rotmat2d(psi + np.pi/2)@L]# Done
+            Gx[inds, 2] = [np.eye(2) zj_r@np.vstack((-sin(zj_b+psi)) + sensor_offset_world_der]# Done
 
             Gz = rot@np.diag([1, zj_r])# Done
 
@@ -315,7 +315,7 @@ class EKFSLAM:
             Rall[inds, inds] = Gz@R@Gz.T# Done, Gz * R * Gz^T, transform measurement covariance from polar to cartesian coordinates
 
         assert len(lmnew) % 2 == 0, "SLAM.add_landmark: lmnew not even length"
-        etaadded = np.concatenate(eta, lmnew)# TODO, append new landmarks to state vector
+        etaadded = np.concatenate(eta, lmnew)# Done, append new landmarks to state vector
         Padded = scipy.linalg.block_diag(P, Gx@P[:3,:3]@Gx+Rall)# Done, block diagonal of P_new, see problem text in 1g) in graded assignment 3
         Padded[n:, :n] = P[:,:3]@Gx.T# Done, top right corner of P_new
         Padded[:n, n:] = Padded[n:, :n].T@Gx# Done, transpose of above. Should yield the same as calcualion, but this enforces symmetry and should be cheaper
@@ -410,8 +410,7 @@ class EKFSLAM:
 
         if numLmk > 0:
             # Prediction and innovation covariance
-            zpred = #TODO
-            H = # TODO
+            zpred, H = self.predict(eta, P, z) #Done
 
             # Here you can use simply np.kron (a bit slow) to form the big (very big in VP after a while) R,
             # or be smart with indexing and broadcasting (3d indexing into 2d mat) realizing you are adding the same R on all diagonals
@@ -426,8 +425,8 @@ class EKFSLAM:
 
             # No association could be made, so skip update
             if za.shape[0] == 0:
-                etaupd = # TODO
-                Pupd = # TODO
+                etaupd = eta #Done
+                Pupd = P# Done
                 NIS = 1 # TODO: beware this one when analysing consistency.
 
             else:
@@ -437,16 +436,23 @@ class EKFSLAM:
 
                 # Kalman mean update
                 # S_cho_factors = la.cho_factor(Sa) # Optional, used in places for S^-1, see scipy.linalg.cho_factor and scipy.linalg.cho_solve
+
+                S_cho_factor, low = la.cho_factor(S)
+
+
                 W = # TODO, Kalman gain, can use S_cho_factors
                 etaupd = # TODO, Kalman update
 
                 # Kalman cov update: use Joseph form for stability
                 jo = -W @ Ha
+                P_update = 
                 jo[np.diag_indices(jo.shape[0])] += 1  # same as adding Identity mat
-                Pupd = # TODO, Kalman update. This is the main workload on VP after speedups
+                Pupd = Jo@P@Jo.T+W@self.R@W.T# Done, Kalman update. This is the main workload on VP after speedups
 
                 # calculate NIS, can use S_cho_factors
-                NIS = # TODO
+                S_cho_factor = la.cho_factor(P_upd)
+                NIS = v.T@la.cho_solve(S_cho_factor,v) #Done
+
 
                 # When tested, remove for speed
                 assert np.allclose(Pupd, Pupd.T), "EKFSLAM.update: Pupd not symmetric"
@@ -469,7 +475,7 @@ class EKFSLAM:
                 z_new_inds[::2] = is_new_lmk
                 z_new_inds[1::2] = is_new_lmk
                 z_new = z[z_new_inds]
-                etaupd, Pupd = # TODO, add new landmarks.
+                etaupd, Pupd = self.add_landmarks(eta, P, z_new) # Done, add new landmarks.
 
         assert np.allclose(Pupd, Pupd.T), "EKFSLAM.update: Pupd must be symmetric"
         assert np.all(np.linalg.eigvals(Pupd) >= 0), "EKFSLAM.update: Pupd must be PSD"
