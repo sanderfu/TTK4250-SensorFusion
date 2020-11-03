@@ -250,11 +250,10 @@ class EKFSLAM:
             H_mi = -H_xi[:,:2]
             
             assert (np.shape(H_xi)==np.shape(Hx[2*i:2*i+2,:])), "Hfunc, H_xi incorrect shape"
-            assert (np.shape(H_mi)==np.shape(Hm[2*i:2*i+2,2*i:2*i+2]), "Hfunc, H_mi incorrect shape"
+            assert (np.shape(H_mi)==np.shape(Hm[2*i:2*i+2,2*i:2*i+2])), "Hfunc, H_mi incorrect shape"
 
             #Placing H_xi and H_mi in H
-            H[2*i:2*i+2,:2]=H_xi
-            np.putmask(Hx, [2*i:2*i+2,:], H_xi )
+            H[2*i:2*i+2,:]=H_xi
             Hm[2*i:2*i+2,2*i:2*i+2]=H_mi
 
         # In what follows you can be clever and avoid making this for all the landmarks you _know_
@@ -313,7 +312,7 @@ class EKFSLAM:
             lmnew[inds] = rot@np.array([zj_r*np.cos(zj_b),zj_r*np.sin(zj_b)])+sensor_offset_world
 
 
-            Gx[inds, :] = [I2, zj_r@np.vstack(([-np.sin(zj_b+psi],[np.cos(zj_b+psi)])) + sensor_offset_world_der]# Done
+            Gx[inds, :] = [I2, zj_r@np.vstack([-np.sin(zj_b+psi)],[np.cos(zj_b+psi)]) + sensor_offset_world_der]# Done
 
             Gz = rot@np.diag([1, zj_r])# Done
 
