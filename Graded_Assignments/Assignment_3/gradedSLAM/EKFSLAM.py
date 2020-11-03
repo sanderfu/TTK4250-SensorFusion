@@ -187,10 +187,10 @@ class EKFSLAM:
 
             
 
-        zpredcart = np.array([Rot@delta_m[:, j] for j in range(np.shape(m)[1]])# TODO, predicted measurements in cartesian coordinates, beware sensor offset for VP
+        zpredcart = np.array([Rot@delta_m[:, j] for j in range(np.shape(m)[1])])# TODO, predicted measurements in cartesian coordinates, beware sensor offset for VP
 
         zpred_r = np.sqrt(zpredcart[0, :]**2 + zpredcart[1,:]**2)# TODO, ranges
-        zpred_theta = np.atan2(zpredcart[1,:], zpredcart[0, :])= # TODO, bearings
+        zpred_theta = np.atan2(zpredcart[1,:], zpredcart[0, :]) # TODO, bearings
         zpred = np.vstack(zpred_r, zpred_theta) # Done, the two arrays above stacked on top of each other vertically like 
         # [ranges; 
         #  bearings]
@@ -253,7 +253,8 @@ class EKFSLAM:
             assert (np.shape(H_mi)==np.shape(Hm[2*i:2*i+2,2*i:2*i+2]), "Hfunc, H_mi incorrect shape"
 
             #Placing H_xi and H_mi in H
-            Hx[2*i:2*i+2,:]=H_xi
+            H[2*i:2*i+2,:2]=H_xi
+            np.putmask(Hx, [2*i:2*i+2,:], H_xi )
             Hm[2*i:2*i+2,2*i:2*i+2]=H_mi
 
         # In what follows you can be clever and avoid making this for all the landmarks you _know_
