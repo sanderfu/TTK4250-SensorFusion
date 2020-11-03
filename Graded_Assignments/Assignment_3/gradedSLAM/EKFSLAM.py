@@ -414,7 +414,8 @@ class EKFSLAM:
 
         if numLmk > 0:
             # Prediction and innovation covariance
-            zpred, H = self.predict(eta, P, z) #Done
+            zpred = self.h(eta, P, z) #Done
+            H = self.H(eta)
             # Here you can use simply np.kron (a bit slow) to form the big (very big in VP after a while) R,
             # or be smart with indexing and broadcasting (3d indexing into 2d mat) realizing you are adding the same R on all diagonals
             R_large = np.kron(np.eye(numLmk),self.R)
