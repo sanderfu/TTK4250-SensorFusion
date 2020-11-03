@@ -286,6 +286,8 @@ class EKFSLAM:
 
         lmnew = np.empty_like(z)
 
+        
+
         Gx = np.empty((numLmk * 2, 3))
         Rall = np.zeros((numLmk * 2, numLmk * 2))
 
@@ -297,22 +299,26 @@ class EKFSLAM:
             ind = 2 * j
             inds = slice(ind, ind + 2)
             zj = z[inds]
+            zj_r = zj[0]
+            zj_b = zj[1]
 
-            rot = # TODO, rotmat in Gz
-            lmnew[inds] = # TODO, calculate position of new landmark in world frame
+            psi = x[2]
+            rot = rotmat2d(zj_b+psi) # Done, rotmat in Gz
+            lmnew[inds] = rot@zj# Done, calculate position of new landmark in world frame
 
-            Gx[inds, :2] = # TODO
-            Gx[inds, 2] = # TODO
+            Gx[inds, :2] = np.eye(2) # Done
+            Gx[inds, 2] = [np.eye(2) zj_r@np.vstack((-sin(zj_b+psi)) + rotmat2d(psi + np.pi/2)@L]# Done
 
-            Gz = # TODO
+            Gz = rot@np.diag([1, zj_r])# Done
 
-            Rall[inds, inds] = # TODO, Gz * R * Gz^T, transform measurement covariance from polar to cartesian coordinates
+            #Can be moved outside of block I believe, if we save to np array GZ
+            Rall[inds, inds] = Gz@R@Gz.T# Done, Gz * R * Gz^T, transform measurement covariance from polar to cartesian coordinates
 
         assert len(lmnew) % 2 == 0, "SLAM.add_landmark: lmnew not even length"
-        etaadded = # TODO, append new landmarks to state vector
-        Padded = # TODO, block diagonal of P_new, see problem text in 1g) in graded assignment 3
-        Padded[n:, :n] = # TODO, top right corner of P_new
-        Padded[:n, n:] = # TODO, transpose of above. Should yield the same as calcualion, but this enforces symmetry and should be cheaper
+        etaadded = np.concatenate(eta, lmnew)# TODO, append new landmarks to state vector
+        Padded = scipy.linalg.block_diag(P, Gx@P[:3,:3]@Gx+Rall)# Done, block diagonal of P_new, see problem text in 1g) in graded assignment 3
+        Padded[n:, :n] = P[:,:3]@Gx.T# Done, top right corner of P_new
+        Padded[:n, n:] = Padded[n:, :n].T@Gx# Done, transpose of above. Should yield the same as calcualion, but this enforces symmetry and should be cheaper
 
         assert (
             etaadded.shape * 2 == Padded.shape
