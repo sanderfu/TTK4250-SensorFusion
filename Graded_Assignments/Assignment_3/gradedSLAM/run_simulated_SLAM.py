@@ -91,7 +91,6 @@ z = [zk.T for zk in simSLAM_ws["z"].ravel()]
 landmarks = simSLAM_ws["landmarks"].T
 odometry = simSLAM_ws["odometry"].T
 poseGT = simSLAM_ws["poseGT"].T
-etaGT = np.concatenate(poseGT,landmarks)
 
 K = len(z)
 M = len(landmarks)

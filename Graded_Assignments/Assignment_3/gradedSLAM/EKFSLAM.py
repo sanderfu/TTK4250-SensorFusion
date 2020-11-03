@@ -298,7 +298,7 @@ class EKFSLAM:
         sensor_offset_world = rotmat2d(eta[2]) @ self.sensor_offset # For transforming landmark position into world frame
         sensor_offset_world_der = rotmat2d(eta[2] + np.pi / 2) @ self.sensor_offset # Used in Gx
 
-        psi = x[2]
+        psi = eta[2]
         for j in range(numLmk):
             ind = 2 * j
             inds = slice(ind, ind + 2)
@@ -312,15 +312,15 @@ class EKFSLAM:
             lmnew[inds] = rot@np.array([zj_r*np.cos(zj_b),zj_r*np.sin(zj_b)])+sensor_offset_world
 
 
-            Gx[inds, :] = [I2, zj_r@np.vstack([-np.sin(zj_b+psi)],[np.cos(zj_b+psi)]) + sensor_offset_world_der]# Done
+            Gx[inds, :] = np.hstack((I2, zj_r*np.vstack(([-np.sin(zj_b+psi)],[np.cos(zj_b+psi)])) + sensor_offset_world_der.reshape((2,1))))# Done
 
             Gz = rot@np.diag([1, zj_r])# Done
 
             Rall[inds, inds] = Gz@self.R@Gz.T# Done, Gz * R * Gz^T, transform measurement covariance from polar to cartesian coordinates
 
         assert len(lmnew) % 2 == 0, "SLAM.add_landmark: lmnew not even length"
-        etaadded = np.concatenate(eta, lmnew)# Done, append new landmarks to state vector
-        Padded = scipy.linalg.block_diag(P, Gx@P[:3,:3]@Gx+Rall)# Done, block diagonal of P_new, see problem text in 1g) in graded assignment 3
+        etaadded = np.concatenate((eta, lmnew))# Done, append new landmarks to state vector
+        Padded = la.block_diag(P, Gx@P[:3,:3]@Gx+Rall)# Done, block diagonal of P_new, see problem text in 1g) in graded assignment 3
         Padded[n:, :n] = P[:,:3]@Gx.T# Done, top right corner of P_new
         Padded[:n, n:] = Padded[n:, :n].T@Gx# Done, transpose of above. Should yield the same as calcualion, but this enforces symmetry and should be cheaper
 
