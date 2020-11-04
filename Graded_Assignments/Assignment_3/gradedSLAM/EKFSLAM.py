@@ -176,8 +176,8 @@ class EKFSLAM:
         """
         # extract states and map
         x = eta[0:3]
-        ## reshape map (2, #landmarks), m[:, j] is the jth landmark
-        m = eta[3:].reshape((-1, 2)).T
+        ## reshape map (2, #landmarks), m[j] is the jth landmark
+        m = eta[3:].reshape((2, -1)).T #NB CHANGED from -1, 2
 
         Rot = rotmat2d(-x[2])
         
@@ -187,11 +187,11 @@ class EKFSLAM:
 
             
 
-        zpredcart = np.array([Rot@delta_m[:, j] for j in range(np.shape(m)[1])])# TODO, predicted measurements in cartesian coordinates, beware sensor offset for VP
+        zpredcart = np.array([Rot@delta_m[j] for j in range(np.shape(m)[0])])# TODO, predicted measurements in cartesian coordinates, beware sensor offset for VP
 
-        zpred_r = np.sqrt(zpredcart[0, :]**2 + zpredcart[1,:]**2)# TODO, ranges
-        zpred_theta = np.atan2(zpredcart[1,:], zpredcart[0, :]) # TODO, bearings
-        zpred = np.vstack(zpred_r, zpred_theta) # Done, the two arrays above stacked on top of each other vertically like 
+        zpred_r = np.sqrt(zpredcart[:, 0]**2 + zpredcart[:,1]**2)# TODO, ranges
+        zpred_theta = np.arctan2(zpredcart[:,1], zpredcart[:,0]) # TODO, bearings
+        zpred = np.vstack((zpred_r, zpred_theta)) # Done, the two arrays above stacked on top of each other vertically like 
         # [ranges; 
         #  bearings]
         # into shape (2, #lmrk)
@@ -219,9 +219,9 @@ class EKFSLAM:
         # extract states and map
         x = eta[0:3]
         ## reshape map (2, #landmarks), m[j] is the jth landmark
-        m = eta[3:].reshape((-1, 2)).T
+        m = eta[3:].reshape((2, -1)).T
 
-        numM = m.shape[1]
+        numM = m.shape[0]
 
         Rot = rotmat2d(x[2])
 
@@ -242,8 +242,8 @@ class EKFSLAM:
         for i in range(numM):
             zc_i = zc[i]
             delta_mi = delta_m[i]
-            zrange = zc_i.T/la.norm(zc_i,2)@np.array([-np.eye(2), -Rpihalf@delta_mi])
-            zbearing = zc_i.T@Rpihalf.T/la.norm(zc_i, 2)**2 @ np.array([-np.eye(2), -Rpihalf@delta_mi])
+            zrange = zc_i.T/la.norm(zc_i,2)@np.hstack((-np.eye(2), np.array(-Rpihalf@delta_mi).reshape(2,1)))
+            zbearing = zc_i.T@Rpihalf.T/la.norm(zc_i, 2)**2 @ np.hstack((-np.eye(2), np.array(-Rpihalf@delta_mi).reshape(2,1)))
             zpred_i = np.vstack((zrange,zbearing))
             #Note: zpred_i = H_x^i
             H_xi = zpred_i
@@ -253,13 +253,13 @@ class EKFSLAM:
             assert (np.shape(H_mi)==np.shape(Hm[2*i:2*i+2,2*i:2*i+2])), "Hfunc, H_mi incorrect shape"
 
             #Placing H_xi and H_mi in H
-            H[2*i:2*i+2,:]=H_xi
+            Hx[2*i:2*i+2,:]=H_xi
             Hm[2*i:2*i+2,2*i:2*i+2]=H_mi
 
         # In what follows you can be clever and avoid making this for all the landmarks you _know_
         # you will not detect (the maximum range should be available from the data).
         # But keep it simple to begin with.
-
+        assert(np.shape(H) == (2*numM, 3+ 2*numM))
         # TONO: You can set some assertions here to make sure that some of the structure in H is correct
         return H
 
@@ -414,7 +414,7 @@ class EKFSLAM:
 
         if numLmk > 0:
             # Prediction and innovation covariance
-            zpred = self.h(eta, P, z) #Done
+            zpred = self.h(eta) #Done
             H = self.H(eta)
             # Here you can use simply np.kron (a bit slow) to form the big (very big in VP after a while) R,
             # or be smart with indexing and broadcasting (3d indexing into 2d mat) realizing you are adding the same R on all diagonals
@@ -440,26 +440,27 @@ class EKFSLAM:
                 # Create the associated innovation
                 v = za.ravel() - zpred  # za: 2D -> flat
                 v[1::2] = utils.wrapToPi(v[1::2])
+                innov = np.hstack((np.zeros(3), v))
 
                 # Kalman mean update
                 # S_cho_factors = la.cho_factor(Sa) # Optional, used in places for S^-1, see scipy.linalg.cho_factor and scipy.linalg.cho_solve
 
-                S_cho_factor = la.cho_factor(S)
+                S_cho_factor = la.cho_factor(Sa)
 
-                #Calculating the innovation
-                innovation = z-zpred
+                #Calculating the innovation, already done
+                #innovation = z-zpred
 
                 #Eq 11.19
-                W = P@linalg.cho_solve(S_cho_factor,H)    #Done, Kalman gain, can use S_cho_factors
-                etaupd = eta + W@innovation #Done, Kalman update
-
+                W = P@la.cho_solve(S_cho_factor,Ha).T    #Done, Kalman gain, can use S_cho_factors
+                etaupd = eta + W@v #Done, Kalman update
+                
                 # Kalman cov update: use Joseph form for stability
                 jo = -W @ Ha
                 jo[np.diag_indices(jo.shape[0])] += 1  # same as adding Identity mat
-                Pupd = Jo@P@Jo.T+W@R_large@W.T# Done, Kalman update. This is the main workload on VP after speedups
+                Pupd = jo@P@jo.T+W@R_large[:len(v), :len(v)]@W.T# Done, Kalman update. This is the main workload on VP after speedups
 
                 # calculate NIS, can use S_cho_factors
-                NIS = innovation.T@la.cho_solve(S_cho_factor,innovation) #Done
+                NIS = v.T@la.cho_solve(S_cho_factor,v) #Done
 
                 # When tested, remove for speed
                 assert np.allclose(Pupd, Pupd.T), "EKFSLAM.update: Pupd not symmetric"

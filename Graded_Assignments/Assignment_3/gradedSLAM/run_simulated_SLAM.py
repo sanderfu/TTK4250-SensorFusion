@@ -91,7 +91,7 @@ z = [zk.T for zk in simSLAM_ws["z"].ravel()]
 landmarks = simSLAM_ws["landmarks"].T
 odometry = simSLAM_ws["odometry"].T
 poseGT = simSLAM_ws["poseGT"].T
-
+pose_dim = len(poseGT[0])
 K = len(z)
 M = len(landmarks)
 
@@ -160,7 +160,7 @@ for k, z_k in tqdm(enumerate(z[:N])):
     else:
         NISnorm[k] = 1
         CInorm[k].fill(1)
-    NEESes[k] = slam.NEESes(eta_hat[k][:3],P_hat[k],poseGT[k]) #Done, use provided function slam.NEESes
+    NEESes[k] = slam.NEESes(eta_hat[k][:pose_dim],P_hat[k][:pose_dim, :pose_dim],poseGT[k]) #Done, use provided function slam.NEESes
 
     if doAssoPlot and k > 0:
         axAsso.clear()
