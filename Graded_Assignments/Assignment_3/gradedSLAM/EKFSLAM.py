@@ -180,7 +180,7 @@ class EKFSLAM:
         ## reshape map (2, #landmarks), m[:,j] is the jth landmark
         m = eta[3:].reshape((-1, 2)).T #DONE
 
-        Rot = rotmat2d(-x[2])
+        Rot = rotmat2d(x[2])
         
         # None as index ads an axis with size 1 at that position.
         # Numpy broadcasts size 1 dimensions to any size when needed
@@ -188,7 +188,7 @@ class EKFSLAM:
 
             
 
-        zpredcart = Rot@delta_m - self.sensor_offset.reshape((2,1))# Done, predicted measurements in cartesian coordinates, beware sensor offset for VP
+        zpredcart = Rot.T@delta_m - self.sensor_offset.reshape((2,1))# Done, predicted measurements in cartesian coordinates, beware sensor offset for VP
 
         zpred_r = la.norm(zpredcart, axis=0)# TODO, ranges
         zpred_theta = np.arctan2(zpredcart[1], zpredcart[0]) # TODO, bearings
@@ -229,7 +229,7 @@ class EKFSLAM:
 
         delta_m = m - pos  #DONE, relative position of landmark to robot in world frame. m - rho that appears in (11.15) and (11.16)
 
-        zc = Rot@delta_m - self.sensor_offset.reshape((2,1)) #DONE, (2, #measurements), each measured position in cartesian coordinates like
+        zc = Rot.T@delta_m - self.sensor_offset.reshape((2,1)) #DONE, (2, #measurements), each measured position in cartesian coordinates like
         # [x coordinates;
         #  y coordinates]
         Rpihalf = rotmat2d(np.pi / 2)
@@ -461,7 +461,7 @@ class EKFSLAM:
                 Pupd = jo@P@jo.T+W@R_large[:len(v), :len(v)]@W.T# Done, Kalman update. This is the main workload on VP after speedups
 
                 # calculate NIS, can use S_cho_factors
-                NIS = v.T@la.cho_solve(S_cho_factor,v) #Done
+                NIS = v.T@la.cho_solve(Sa_cho_factor,v) #Done
 
                 # When tested, remove for speed
                 assert np.allclose(Pupd, Pupd.T), "EKFSLAM.update: Pupd not symmetric"
