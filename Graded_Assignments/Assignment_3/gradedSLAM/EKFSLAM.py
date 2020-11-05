@@ -180,8 +180,7 @@ class EKFSLAM:
         ## reshape map (2, #landmarks), m[:,j] is the jth landmark
         m = eta[3:].reshape((-1, 2)).T #DONE
 
-        Rot = rotmat2d(x[2])
-        
+        Rot = rotmat2d(x[2])        
         # None as index ads an axis with size 1 at that position.
         # Numpy broadcasts size 1 dimensions to any size when needed
         delta_m = m - pos # Done, relative position of landmark to sensor on robot in world frame
@@ -311,10 +310,10 @@ class EKFSLAM:
             rot = rotmat2d(zj_b+psi) # Done, rotmat in Gz
             
             #Comment: Should we add or subtract sensor_offset_world?
-            lmnew[inds] = rot@np.array([zj_r*np.cos(zj_b),zj_r*np.sin(zj_b)])+sensor_offset_world
+            lmnew[inds] = eta[0:2] + np.array([zj_r*np.cos(psi+zj_b),zj_r*np.sin(psi+zj_b)]) - sensor_offset_world
 
-
-            Gx[inds, :] = np.hstack((I2, zj_r*np.vstack(([-np.sin(zj_b+psi)],[np.cos(zj_b+psi)])) + sensor_offset_world_der.reshape((2,1))))# Done
+            Gx[inds, :2] = I2
+            Gx[inds, 2] = zj_r*np.array([-np.sin(zj_b+psi),np.cos(zj_b+psi)]) + sensor_offset_world_der# Done
 
             Gz = rot@np.diag([1, zj_r])# Done
 
@@ -324,7 +323,7 @@ class EKFSLAM:
         etaadded = np.concatenate((eta, lmnew))# Done, append new landmarks to state vector
         Padded = la.block_diag(P, Gx@P[:3,:3]@Gx.T+Rall)# Done, block diagonal of P_new, see problem text in 1g) in graded assignment 3
         Padded[:n, n:] = P[:,:3]@Gx.T# Done, top right corner of P_new
-        Padded[n:, :n] = Gx@P[:3, :]# Done, transpose of above. Should yield the same as calcualion, but this enforces symmetry and should be cheaper
+        Padded[n:, :n] = Padded[:n, n:].T# Done, transpose of above. Should yield the same as calcualion, but this enforces symmetry and should be cheaper
 
         assert (
             etaadded.shape * 2 == Padded.shape
