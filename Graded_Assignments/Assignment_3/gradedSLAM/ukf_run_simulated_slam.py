@@ -1,13 +1,26 @@
-# %% Imports
-from typing import List, Optional
+"""
+File name: ukf_run_simulated_slam.py
 
+Creation Date: Do 05 Nov 2020
+
+Description:
+
+"""
+
+# Standard Python Libraries
+# -----------------------------------------------------------------------------------------
+from typing import List, Optional
 from scipy.io import loadmat
 import numpy as np
 
 import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib import animation
 from scipy.stats import chi2
+from matplotlib import animation
+
+# Local Application Modules
+# -----------------------------------------------------------------------------------------
+
 from utils import wrapToPi
 
 try:
@@ -73,7 +86,7 @@ except Exception as e:
 
 
 
-from EKFSLAM import EKFSLAM
+from UKFSLAM import UKFSLAM
 from plotting import ellipse
 
 # %% Load data
@@ -105,7 +118,7 @@ JCBBalphas = np.array([0.05, 0.05])  #INITDONE first is for joint compatibility,
 # these can have a large effect on runtime either through the number of landmarks created
 # or by the size of the association search space.
 
-slam = EKFSLAM(Q, R, do_asso=doAsso, alphas=JCBBalphas)
+slam = UKFSLAM(Q, R, do_asso=doAsso, alphas=JCBBalphas)
 
 # allocate
 eta_pred: List[Optional[np.ndarray]] = [None] * K
@@ -135,7 +148,7 @@ if doAssoPlot:
     figAsso, axAsso = plt.subplots(num=1, clear=True)
 
 # %% Run simulation
-N = K
+N = 100
 
 print("starting sim (" + str(N) + " iterations)")
 
@@ -306,7 +319,7 @@ if playMovie:
 
     except ImportError:
         print(
-            "Install celluloid module, \n\n$ pip install celluloid\n\nto get fancy animation of EKFSLAM."
+            "Install celluloid module, \n\n$ pip install celluloid\n\nto get fancy animation of UKFSLAM."
         )
 
 plt.show()
