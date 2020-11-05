@@ -96,8 +96,8 @@ K = len(z)
 M = len(landmarks)
 
 # %% Initilize
-Q = np.eye(3) #INITDONE
-R = np.eye(2) #INITDONE
+Q = np.diag([0.1**2,0.1**2,(np.pi/180)**2]) #INITDONE
+R = np.diag([1**2, (5*np.pi/180)**2]) #INITDONE
 
 doAsso = True
 
@@ -124,7 +124,7 @@ alpha = 0.05
 
 # init
 eta_pred[0] = poseGT[0]  # we start at the correct position for reference
-P_pred[0] = np.zeros((3, 3))  # we also say that we are 100% sure about that
+P_pred[0] = 0.0001* np.eye(3)  # we also say that we are 100% sure about that
 
 # %% Set up plotting
 # plotting
@@ -135,7 +135,7 @@ if doAssoPlot:
     figAsso, axAsso = plt.subplots(num=1, clear=True)
 
 # %% Run simulation
-N = 100
+N = 500
 
 print("starting sim (" + str(N) + " iterations)")
 

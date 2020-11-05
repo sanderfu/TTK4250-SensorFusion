@@ -146,11 +146,11 @@ class EKFSLAM:
         # cov matrix layout:
         # [[P_xx, P_xm],
         # [P_mx, P_mm]]
-        G = np.eye(3)
         M = (np.shape(eta)[0] - 3)/2.0
-        P[:3, :3] = Fx@P[:3, :3]@Fx.T + G@self.Q@G.T# Done robot cov prediction
+        #Eq. 11.18 (they used some G without mentioning what it was, assuming identity
+        P[:3, :3] = Fx@P[:3, :3]@Fx.T + self.Q# Done robot cov prediction
         P[:3, 3:] = Fx@P[:3, 3:]# Done robot-map covariance prediction
-        P[3:, :3] = P[3:, :3]@Fx.T# Done map-robot covariance: transpose of the above
+        P[3:, :3] = P[:3, 3:].T# Done map-robot covariance: transpose of the above
 
         assert np.allclose(P, P.T), "EKFSLAM.predict: not symmetric P"
         assert np.all(
@@ -189,8 +189,8 @@ class EKFSLAM:
 
         zpredcart = Rot.T@delta_m - self.sensor_offset.reshape((2,1))# Done, predicted measurements in cartesian coordinates, beware sensor offset for VP
 
-        zpred_r = la.norm(zpredcart, axis=0)# TODO, ranges
-        zpred_theta = np.arctan2(zpredcart[1], zpredcart[0]) # TODO, bearings
+        zpred_r = la.norm(zpredcart, axis=0)# Done, ranges
+        zpred_theta = np.arctan2(zpredcart[1], zpredcart[0]) # Done, bearings
         zpred = np.vstack((zpred_r, zpred_theta)) # Done, the two arrays above stacked on top of each other vertically like 
         # [ranges; 
         #  bearings]
@@ -228,7 +228,7 @@ class EKFSLAM:
 
         delta_m = m - pos  #DONE, relative position of landmark to robot in world frame. m - rho that appears in (11.15) and (11.16)
 
-        zc = Rot.T@delta_m - self.sensor_offset.reshape((2,1)) #DONE, (2, #measurements), each measured position in cartesian coordinates like
+        zc = delta_m - Rot@self.sensor_offset.reshape((2,1)) #DONE, (2, #measurements), each measured position in cartesian coordinates like
         # [x coordinates;
         #  y coordinates]
         Rpihalf = rotmat2d(np.pi / 2)
@@ -310,7 +310,7 @@ class EKFSLAM:
             rot = rotmat2d(zj_b+psi) # Done, rotmat in Gz
             
             #Comment: Should we add or subtract sensor_offset_world?
-            lmnew[inds] = eta[0:2] + np.array([zj_r*np.cos(psi+zj_b),zj_r*np.sin(psi+zj_b)]) - sensor_offset_world
+            lmnew[inds] = eta[0:2] + np.array([zj_r*np.cos(psi+zj_b),zj_r*np.sin(psi+zj_b)]) + sensor_offset_world
 
             Gx[inds, :2] = I2
             Gx[inds, 2] = zj_r*np.array([-np.sin(zj_b+psi),np.cos(zj_b+psi)]) + sensor_offset_world_der# Done
