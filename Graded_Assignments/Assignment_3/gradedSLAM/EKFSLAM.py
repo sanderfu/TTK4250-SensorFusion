@@ -442,18 +442,17 @@ class EKFSLAM:
                 # Create the associated innovation
                 v = za.ravel() - zpred  # za: 2D -> flat
                 v[1::2] = utils.wrapToPi(v[1::2])
-                innov = np.hstack((np.zeros(3), v))
 
                 # Kalman mean update
                 # S_cho_factors = la.cho_factor(Sa) # Optional, used in places for S^-1, see scipy.linalg.cho_factor and scipy.linalg.cho_solve
 
-                S_cho_factor = la.cho_factor(Sa)
+                Sa_cho_factor = la.cho_factor(Sa)
 
                 #Calculating the innovation, already done
                 #innovation = z-zpred
 
                 #Eq 11.19
-                W = P@la.cho_solve(S_cho_factor,Ha).T    #Done, Kalman gain, can use S_cho_factors
+                W = P@la.cho_solve(Sa_cho_factor,Ha).T    #Done, Kalman gain, can use S_cho_factors
                 etaupd = eta + W@v #Done, Kalman update
                 
                 # Kalman cov update: use Joseph form for stability

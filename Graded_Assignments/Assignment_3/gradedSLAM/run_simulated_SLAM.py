@@ -135,7 +135,7 @@ if doAssoPlot:
     figAsso, axAsso = plt.subplots(num=1, clear=True)
 
 # %% Run simulation
-N = K
+N = 30
 
 print("starting sim (" + str(N) + " iterations)")
 
@@ -181,7 +181,7 @@ for k, z_k in tqdm(enumerate(z[:N])):
 print("sim complete")
 
 pose_est = np.array([x[:3] for x in eta_hat[:N]])
-lmk_est = [eta_hat_k[3:].reshape(-1, 2) for eta_hat_k in eta_hat]
+lmk_est = [eta_hat_k[3:].reshape(-1, 2) for eta_hat_k in eta_hat[:N]]
 lmk_est_final = lmk_est[N - 1]
 
 np.set_printoptions(precision=4, linewidth=100)
