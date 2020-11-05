@@ -101,7 +101,7 @@ R = np.eye(2) #INITDONE
 
 doAsso = True
 
-JCBBalphas = np.array([0.001, 0.0001])  #INITDONE first is for joint compatibility, second is individual
+JCBBalphas = np.array([0.05, 0.05])  #INITDONE first is for joint compatibility, second is individual
 # these can have a large effect on runtime either through the number of landmarks created
 # or by the size of the association search space.
 

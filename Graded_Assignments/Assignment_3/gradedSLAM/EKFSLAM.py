@@ -176,21 +176,22 @@ class EKFSLAM:
         """
         # extract states and map
         x = eta[0:3]
-        ## reshape map (2, #landmarks), m[j] is the jth landmark
-        m = eta[3:].reshape((2, -1)).T #NB CHANGED from -1, 2
+        pos = x[:2].reshape((2,1))
+        ## reshape map (2, #landmarks), m[:,j] is the jth landmark
+        m = eta[3:].reshape((-1, 2)).T #DONE
 
         Rot = rotmat2d(-x[2])
         
         # None as index ads an axis with size 1 at that position.
         # Numpy broadcasts size 1 dimensions to any size when needed
-        delta_m = m - x[:2] - Rot@self.sensor_offset # Done, relative position of landmark to sensor on robot in world frame
+        delta_m = m - pos # Done, relative position of landmark to sensor on robot in world frame
 
             
 
-        zpredcart = np.array([Rot@delta_m[j] for j in range(np.shape(m)[0])])# TODO, predicted measurements in cartesian coordinates, beware sensor offset for VP
+        zpredcart = Rot@delta_m - self.sensor_offset.reshape((2,1))# Done, predicted measurements in cartesian coordinates, beware sensor offset for VP
 
-        zpred_r = np.sqrt(zpredcart[:, 0]**2 + zpredcart[:,1]**2)# TODO, ranges
-        zpred_theta = np.arctan2(zpredcart[:,1], zpredcart[:,0]) # TODO, bearings
+        zpred_r = la.norm(zpredcart, axis=0)# TODO, ranges
+        zpred_theta = np.arctan2(zpredcart[1], zpredcart[0]) # TODO, bearings
         zpred = np.vstack((zpred_r, zpred_theta)) # Done, the two arrays above stacked on top of each other vertically like 
         # [ranges; 
         #  bearings]
@@ -218,16 +219,17 @@ class EKFSLAM:
         """
         # extract states and map
         x = eta[0:3]
-        ## reshape map (2, #landmarks), m[j] is the jth landmark
-        m = eta[3:].reshape((2, -1)).T
+        pos = x[:2].reshape((2,1))
+        ## reshape map (2, #landmarks), m[:,j] is the jth landmark
+        m = eta[3:].reshape((-1, 2)).T
 
-        numM = m.shape[0]
+        numM = m.shape[1]
 
         Rot = rotmat2d(x[2])
 
-        delta_m = m - x[:2]  #DONE, relative position of landmark to robot in world frame. m - rho that appears in (11.15) and (11.16)
+        delta_m = m - pos  #DONE, relative position of landmark to robot in world frame. m - rho that appears in (11.15) and (11.16)
 
-        zc = delta_m - Rot@self.sensor_offset #DONE, (2, #measurements), each measured position in cartesian coordinates like
+        zc = Rot@delta_m - self.sensor_offset.reshape((2,1)) #DONE, (2, #measurements), each measured position in cartesian coordinates like
         # [x coordinates;
         #  y coordinates]
         Rpihalf = rotmat2d(np.pi / 2)
@@ -240,8 +242,8 @@ class EKFSLAM:
         Hm = H[:, 3:]  # slice view, setting elements of Hm will set H as well
 
         for i in range(numM):
-            zc_i = zc[i]
-            delta_mi = delta_m[i]
+            zc_i = zc[:,i]
+            delta_mi = delta_m[:,i]
             zrange = zc_i.T/la.norm(zc_i,2)@np.hstack((-np.eye(2), np.array(-Rpihalf@delta_mi).reshape(2,1)))
             zbearing = zc_i.T@Rpihalf.T/la.norm(zc_i, 2)**2 @ np.hstack((-np.eye(2), np.array(-Rpihalf@delta_mi).reshape(2,1)))
             zpred_i = np.vstack((zrange,zbearing))
