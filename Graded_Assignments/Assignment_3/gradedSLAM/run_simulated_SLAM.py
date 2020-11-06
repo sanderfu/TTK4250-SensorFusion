@@ -96,8 +96,8 @@ K = len(z)
 M = len(landmarks)
 
 # %% Initilize
-Q = np.diag([0.1**2,0.1**2,(np.pi/180)**2]) #INITDONE
-R = np.diag([1**2, (5*np.pi/180)**2]) #INITDONE
+Q = np.diag([0.01**2,0.01*2,(0.75*np.pi/180)**2]) #INITDONE
+R = np.diag([0.5**2, (7.5*np.pi/180)**2]) #INITDONE
 
 doAsso = True
 
@@ -105,6 +105,7 @@ JCBBalphas = np.array([0.05, 0.05])  #INITDONE first is for joint compatibility,
 # these can have a large effect on runtime either through the number of landmarks created
 # or by the size of the association search space.
 
+# new landmarks = low
 slam = EKFSLAM(Q, R, do_asso=doAsso, alphas=JCBBalphas)
 
 # allocate
@@ -301,7 +302,7 @@ if playMovie:
                 ax_movie.plot(*el.T, "b")
 
             camera.snap()
-        animation = camera.animate(interval=100, blit=True, repeat=False)
+        animation = camera.animate(interval=10, blit=True, repeat=False)
         print("playing movie")
 
     except ImportError:
