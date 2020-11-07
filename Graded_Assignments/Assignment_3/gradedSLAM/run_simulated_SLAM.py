@@ -96,8 +96,11 @@ K = len(z)
 M = len(landmarks)
 
 # %% Initilize
-Q = np.diag([0.01**2,0.01*2,(0.75*np.pi/180)**2]) #INITDONE
-R = np.diag([0.5**2, (7.5*np.pi/180)**2]) #INITDONE
+Q = 0.3*np.diag([0.01**2,0.01*2,(0.75*np.pi/180)**2]) #INITDONE
+R = np.diag([0.5**2, (2*np.pi/180)**2]) #INITDONE
+
+
+
 
 doAsso = True
 
@@ -122,21 +125,22 @@ NEESes = np.zeros((K, 3))
 
 # For consistency testing
 alpha = 0.05
+confprob = 1 - alpha
 
 # init
 eta_pred[0] = poseGT[0]  # we start at the correct position for reference
-P_pred[0] = 0.0001* np.eye(3)  # we also say that we are 100% sure about that
+P_pred[0] = 0 * np.eye(3)  # we also say that we are 100% sure about that
 
 # %% Set up plotting
 # plotting
 
 doAssoPlot = False
-playMovie = True
+playMovie = False
 if doAssoPlot:
     figAsso, axAsso = plt.subplots(num=1, clear=True)
 
 # %% Run simulation
-N = K
+N = 1000
 
 print("starting sim (" + str(N) + " iterations)")
 
@@ -153,7 +157,7 @@ for k, z_k in tqdm(enumerate(z[:N])):
 
     num_asso = np.count_nonzero(a[k] > -1)
 
-    CI[k] = chi2.interval(alpha, 2 * num_asso)
+    CI[k] = chi2.interval(confprob, 2 * num_asso)
 
     if num_asso > 0:
         NISnorm[k] = NIS[k] / (2 * num_asso)
@@ -216,6 +220,8 @@ ax2.axis("equal")
 ax2.grid()
 
 # %% Consistency
+print("Consistency results:")
+
 
 # NIS
 insideCI = (CInorm[:N,0] <= NISnorm[:N]) * (NISnorm[:N] <= CInorm[:N,1])
@@ -225,7 +231,9 @@ ax3.plot(CInorm[:N,0], '--')
 ax3.plot(CInorm[:N,1], '--')
 ax3.plot(NISnorm[:N], lw=0.5)
 
-ax3.set_title(f'NIS, {insideCI.mean()*100}% inside CI')
+ax3.set_title(f'NIS, {insideCI.mean()*100}% inside {confprob*100}% CI')
+
+
 
 # NEES
 
@@ -234,7 +242,7 @@ tags = ['all', 'pos', 'heading']
 dfs = [3, 2, 1]
 
 for ax, tag, NEES, df in zip(ax4, tags, NEESes.T, dfs):
-    CI_NEES = chi2.interval(alpha, df)
+    CI_NEES = chi2.interval(confprob, df)
     ax.plot(np.full(N, CI_NEES[0]), '--')
     ax.plot(np.full(N, CI_NEES[1]), '--')
     ax.plot(NEES[:N], lw=0.5)

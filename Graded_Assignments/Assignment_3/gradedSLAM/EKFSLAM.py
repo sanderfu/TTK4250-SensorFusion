@@ -148,7 +148,7 @@ class EKFSLAM:
         # [P_mx, P_mm]]
         M = (np.shape(eta)[0] - 3)/2.0
         #Eq. 11.18 (they used some G without mentioning what it was, assuming identity
-        P[:3, :3] = Fx@P[:3, :3]@Fx.T + self.Q# Done robot cov prediction
+        P[:3, :3] = Fx@P[:3, :3]@Fx.T + Fu@self.Q@Fu.T# Done robot cov prediction
         P[:3, 3:] = Fx@P[:3, 3:]# Done robot-map covariance prediction
         P[3:, :3] = P[:3, 3:].T# Done map-robot covariance: transpose of the above
 
