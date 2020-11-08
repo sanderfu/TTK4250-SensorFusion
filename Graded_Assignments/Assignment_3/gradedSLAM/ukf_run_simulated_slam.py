@@ -107,16 +107,18 @@ landmarks = simSLAM_ws["landmarks"].T
 odometry = simSLAM_ws["odometry"].T
 poseGT = simSLAM_ws["poseGT"].T
 pose_dim = len(poseGT[0])
-K = 300 #len(z)
+K = len(z)
 M = len(landmarks)
 
 # %% Initilize
-Q = np.diag([0.4**2,0.4**2,(0.9*np.pi/180)**2]) #INITDONE
-R = np.diag([0.1**2, (5*np.pi/180)**2]) #INITDONE
+
+Q = np.diag([0.1**2,0.1*2,(0.75*np.pi/180)**2]) #INITDONE
+R = np.diag([0.5**2, (2*np.pi/180)**2]) #INITDONE
+
 
 doAsso = True
 
-JCBBalphas = np.array([0.05, 0.05])  #INITDONE first is for joint compatibility, second is individual
+JCBBalphas = np.array([0.01, 0.01])  #INITDONE first is for joint compatibility, second is individual
 # these can have a large effect on runtime either through the number of landmarks created
 # or by the size of the association search space.
 
@@ -163,7 +165,7 @@ for k, z_k in tqdm(enumerate(z[:N])):
    
 
     if k < K - 1:
-        eta_pred[k + 1], P_pred[k + 1], F[k+1] = ukfslam.predict(eta_hat[k],P_hat[k],odometry[k])
+        eta_pred[k + 1], P_pred[k + 1] = ukfslam.predict(eta_hat[k],P_hat[k],odometry[k])
         if not np.all(
             np.linalg.eigvals(P_pred[k+1]) >= 0
         ):
@@ -201,8 +203,7 @@ for k, z_k in tqdm(enumerate(z[:N])):
 
 
 print("sim complete")
-from smoother import rts_smooth
-eta_better, P_better = rts_smooth(eta_pred, P_pred, eta_hat, P_hat, F)
+
 pose_est = np.array([x[:3] for x in eta_hat[:N]])
 lmk_est = [eta_hat_k[3:].reshape(-1, 2) for eta_hat_k in eta_hat[:N]]
 lmk_est_final = lmk_est[N - 1]
@@ -269,7 +270,7 @@ for ax, tag, NEES, df in zip(ax4, tags, NEESes.T, dfs):
     insideCI = (CI_NEES[0] <= NEES) * (NEES <= CI_NEES[1])
     ax.set_title(f'NEES {tag}: {insideCI.mean()*100}% inside CI')
 
-    CI_ANEES = np.array(chi2.interval(alpha, df*N)) / N
+    CI_ANEES = np.array(chi2.interval(confprob, df*N)) / N
     print(f"CI ANEES {tag}: {CI_ANEES}")
     print(f"ANEES {tag}: {NEES.mean()}")
 

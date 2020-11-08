@@ -106,13 +106,13 @@ b = 0.5  # laser distance to the left of center
 
 car = Car(L, H, a, b)
 
-sigmas = [0.01**2,0.05**2,(1*np.pi/180)**2]
+sigmas = [1**2,1**2,(3*np.pi/180)**2]
 CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
 Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
 
 # %% Initilize
 #Q = np.diag([0.1**2,0.1**2,(np.pi/180)**2]) #INITDONE
-R = np.diag([0.1**2, (1*np.pi/180)**2]) #INITDONE
+R = np.diag([2**2, (4*np.pi/180)**2]) #INITDONE
 
 
 JCBBalphas = np.array(
@@ -127,6 +127,7 @@ slam = EKFSLAM(Q, R, do_asso=doAsso, alphas=JCBBalphas, sensor_offset=sensorOffs
 alpha = 0.05
 confidence_prob = 1 - alpha
 
+
 xupd = np.zeros((mK, 3))
 a = [None] * mK
 NIS = np.zeros(mK)
@@ -134,6 +135,13 @@ NISnorm = np.zeros(mK)
 CI = np.zeros((mK, 2))
 CInorm = np.zeros((mK, 2))
 
+NIS_ranges = np.zeros(mK)
+NIS_bearings = np.zeros(mK)
+NISnorm_ranges = np.zeros(mK)
+NISnorm_bearings = np.zeros(mK)
+
+CI_ranges_bearings = np.zeros((mK, 2))
+CInorm_ranges_bearings = np.zeros((mK, 2))
 
 
 # Initialize state
@@ -146,7 +154,7 @@ t = timeOdo[0]
 
 # %%  run
 print(K)
-N = 500#K
+N = 2000#K
 
 doPlot = False
 
@@ -187,18 +195,29 @@ for k in tqdm(range(N)):
         #eta, P = slam.predict(eta,P,odo) # Done predict
 
         z = detectTrees(LASER[mk])
-        eta, P, NIS[mk], a[mk] =  slam.update(eta,P,z) # TODO update
+        eta, P, NIS[mk], NIS_ranges[mk], NIS_bearings[mk], a[mk] =  slam.update(eta,P,z) # TODO update
 
         num_asso = np.count_nonzero(a[mk] > -1)
 
         if num_asso > 0:
             NISnorm[mk] = NIS[mk] / (2 * num_asso)
+            NISnorm_ranges[mk] = NIS_ranges[mk] /num_asso
+            NISnorm_bearings[mk] = NIS_bearings[mk]/num_asso
+            
             CInorm[mk] = np.array(chi2.interval(confidence_prob, 2 * num_asso)) / (
                 2 * num_asso
+            )            
+            CInorm_ranges_bearings[mk] = np.array(chi2.interval(confidence_prob, num_asso)) / (
+                num_asso
             )
         else:
             NISnorm[mk] = 1
+            NISnorm_ranges[mk] = 1
+            NISnorm_bearings[mk] = 1
+            
             CInorm[mk].fill(1)
+
+            CInorm_ranges_bearings[mk].fill(1)
 
         xupd[mk] = eta[:3]
 
@@ -235,9 +254,10 @@ for k in tqdm(range(N)):
 # %% Consistency
 
 # NIS
+confprob = confidence_prob
 insideCI = (CInorm[:mk, 0] <= NISnorm[:mk]) * (NISnorm[:mk] <= CInorm[:mk, 1])
-ANIS = np.mean(NISnorm[:N])
-CI_ANIS = np.array(chi2.interval(confidence_prob,2*N))/N
+ANIS = np.mean(NISnorm[:mk])
+CI_ANIS = np.array(chi2.interval(confidence_prob,2*mk))/mk
 print(f"\nANIS: {ANIS}")
 print(f"CI ANIS: {CI_ANIS}")
 fig3, ax3 = plt.subplots(num=3, clear=True)
@@ -246,6 +266,24 @@ ax3.plot(CInorm[:mk, 1], "--")
 ax3.plot(NISnorm[:mk], lw=0.5)
 
 ax3.set_title(f"NIS, {insideCI.mean()*100:.2f}% inside CI")
+insideCI_ranges = (CInorm_ranges_bearings[:mk,0] <= NISnorm_ranges[:mk]) * (NISnorm_ranges[:mk] <= CInorm_ranges_bearings[:mk,1])
+insideCI_bearings = (CInorm_ranges_bearings[:mk,0] <= NISnorm_bearings[:mk]) * (NISnorm_bearings[:mk] <= CInorm_ranges_bearings[:mk,1])
+
+fig7, ax7 = plt.subplots(nrows=2, ncols=1,num=7, clear=True)
+
+ax7[0].plot(CInorm[:mk,0], '--')
+ax7[0].plot(CInorm[:mk,1], '--')
+ax7[0].plot(NISnorm[:mk], lw=0.5)
+
+ax7[0].legend(['CI lower', 'CI upper', 'NIS'])
+
+ax7[0].set_title(f'NIS, {insideCI.mean()*100}% inside {confprob*100}% CI\n')
+ax7[1].plot(CInorm_ranges_bearings[:mk,0], '--', color='blue')
+ax7[1].plot(CInorm_ranges_bearings[:mk,1], '--', color='blue')
+ax7[1].plot(NISnorm_ranges[:mk], lw=0.5, color='purple')
+ax7[1].plot(NISnorm_bearings[:mk], lw=0.5, color='red')
+ax7[1].legend(['CI lower', 'CI upper','NIS ranges', 'NIS bearings'])
+ax7[1].set_title(f'NIS_ranges, {insideCI_ranges.mean()*100}% inside {confprob*100}% CI\nNIS_bearings, {insideCI_bearings.mean()*100}% inside {confprob*100}% CI')
 
 # %% slam
 

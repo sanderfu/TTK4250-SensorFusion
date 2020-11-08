@@ -436,6 +436,8 @@ class EKFSLAM:
                 #Comment: If no assoc, good idea to set NIS = E[NIS] = DoF
                 #Comment2: A maybe better idea is to skip entirely
                 NIS = 2 # Done: beware this one when analysing consistency.
+                NIS_ranges = 2
+                NIS_bearings = 2
 
             else:
                 # Create the associated innovation
@@ -460,6 +462,17 @@ class EKFSLAM:
                 Pupd = jo@P@jo.T+W@R_large[:len(v), :len(v)]@W.T# Done, Kalman update. This is the main workload on VP after speedups
 
                 # calculate NIS, can use S_cho_factors
+                v_ranges = v[::2]
+                za_ranges = za[::2]
+                v_bearings = v[1::2]
+                za_bearings = v[1::2]
+                
+                Sa_cho_factor_ranges = la.cho_factor(Sa[::2, ::2])
+                Sa_cho_factor_bearings = la.cho_factor(Sa[1::2, 1::2])
+                NIS_ranges = v_ranges.T@la.cho_solve(Sa_cho_factor_ranges,v_ranges) 
+                NIS_bearings = v_bearings.T@la.cho_solve(Sa_cho_factor_bearings,v_bearings) 
+
+
                 NIS = v.T@la.cho_solve(Sa_cho_factor,v) #Done
 
                 # When tested, remove for speed
@@ -472,6 +485,8 @@ class EKFSLAM:
             a = np.full(z.shape[0], -1)
             z = z.flatten()
             NIS = 2 #Done: beware this one, you can change the value to for instance 1
+            NIS_ranges = 2
+            NIS_bearings = 2
             etaupd = eta
             Pupd = P
 
@@ -488,7 +503,7 @@ class EKFSLAM:
         assert np.allclose(Pupd, Pupd.T), "EKFSLAM.update: Pupd must be symmetric"
         assert np.all(np.linalg.eigvals(Pupd) >= 0), "EKFSLAM.update: Pupd must be PSD"
 
-        return etaupd, Pupd, NIS, a
+        return etaupd, Pupd, NIS, NIS_ranges, NIS_bearings, a
 
     @classmethod
     def NEESes(cls, x: np.ndarray, P: np.ndarray, x_gt: np.ndarray,) -> np.ndarray:

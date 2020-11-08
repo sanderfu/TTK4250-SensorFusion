@@ -202,15 +202,15 @@ class UKFSLAM:
         etapred[:3] = x_pred
         etapred[3:] = eta[3:] # Done landmarks: no effect
 
-        Fx = self.Fx(x, z_odo)# Done
+        #Fx = self.Fx(x, z_odo)# Done
 
         # evaluate covariance prediction in place to save computation
         # only robot state changes, so only rows and colums of robot state needs changing
         # cov matrix layout:
         # [[P_xx, P_xm],
         # [P_mx, P_mm]]
-        M = (np.shape(eta)[0] - 3)/2.0
-        F = la.block_diag(Fx, np.eye(int(M*2)))
+        #M = (np.shape(eta)[0] - 3)/2.0
+        #F = la.block_diag(Fx, np.eye(int(M*2)))
 
         #Eq. 11.18 (they used some G without mentioning what it was, assuming identity
         P[:3, :3] = P_pred
@@ -224,7 +224,7 @@ class UKFSLAM:
         assert (
             etapred.shape * 2 == P.shape
         ), "UKFSLAM.predict: calculated shapes does not match"
-        return etapred, P, F
+        return etapred, P
 
     def h(self, eta: np.ndarray) -> np.ndarray:
         """Predict all the landmark positions in sensor frame.

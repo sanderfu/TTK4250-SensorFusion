@@ -118,9 +118,20 @@ eta_hat: List[Optional[np.ndarray]] = [None] * K
 P_hat: List[Optional[np.ndarray]] = [None] * K
 a: List[Optional[np.ndarray]] = [None] * K
 NIS = np.zeros(K)
+NIS_ranges = np.zeros(K)
+NIS_bearings = np.zeros(K)
 NISnorm = np.zeros(K)
+NISnorm_ranges = np.zeros(K)
+NISnorm_bearings = np.zeros(K)
+
 CI = np.zeros((K, 2))
+CI_ranges_bearings = np.zeros((K, 2))
+
 CInorm = np.zeros((K, 2))
+CInorm_ranges_bearings = np.zeros((K, 2))
+
+
+
 NEESes = np.zeros((K, 3))
 
 # For consistency testing
@@ -146,7 +157,7 @@ print("starting sim (" + str(N) + " iterations)")
 
 for k, z_k in tqdm(enumerate(z[:N])):
 
-    eta_hat[k], P_hat[k], NIS[k], a[k] = slam.update(eta_pred[k],P_pred[k],z_k)
+    eta_hat[k], P_hat[k], NIS[k], NIS_ranges[k], NIS_bearings[k], a[k] = slam.update(eta_pred[k],P_pred[k],z_k)
 
     if k < K - 1:
         eta_pred[k + 1], P_pred[k + 1] = slam.predict(eta_hat[k],P_hat[k],odometry[k])
@@ -158,13 +169,20 @@ for k, z_k in tqdm(enumerate(z[:N])):
     num_asso = np.count_nonzero(a[k] > -1)
 
     CI[k] = chi2.interval(confprob, 2 * num_asso)
+    CI_ranges_bearings[k] = chi2.interval(confprob, num_asso)
 
     if num_asso > 0:
         NISnorm[k] = NIS[k] / (2 * num_asso)
+        NISnorm_ranges[k] = NIS_ranges[k]/num_asso
+        NISnorm_bearings[k] = NIS_bearings[k]/num_asso
         CInorm[k] = CI[k] / (2 * num_asso)
+        CInorm_ranges_bearings[k] = CI_ranges_bearings[k]/num_asso
     else:
         NISnorm[k] = 1
+        NISnorm_ranges[k] = 1
+        NISnorm_bearings[k] = 1
         CInorm[k].fill(1)
+        CInorm_ranges_bearings[k].fill(1)
     NEESes[k] = slam.NEESes(eta_hat[k][:pose_dim],P_hat[k][:pose_dim, :pose_dim],poseGT[k]) #Done, use provided function slam.NEESes
 
     if doAssoPlot and k > 0:
@@ -232,11 +250,28 @@ ax3.plot(CInorm[:N,1], '--')
 ax3.plot(NISnorm[:N], lw=0.5)
 
 ax3.set_title(f'NIS, {insideCI.mean()*100}% inside {confprob*100}% CI')
+insideCI_ranges = (CInorm_ranges_bearings[:N,0] <= NISnorm_ranges[:N]) * (NISnorm_ranges[:N] <= CInorm_ranges_bearings[:N,1])
+insideCI_bearings = (CInorm_ranges_bearings[:N,0] <= NISnorm_bearings[:N]) * (NISnorm_bearings[:N] <= CInorm_ranges_bearings[:N,1])
+
+fig7, ax7 = plt.subplots(nrows=2, ncols=1,num=7, clear=True)
+
+ax7[0].plot(CInorm[:N,0], '--')
+ax7[0].plot(CInorm[:N,1], '--')
+ax7[0].plot(NISnorm[:N], lw=0.5)
+
+ax7[0].legend(['CI lower', 'CI upper', 'NIS'])
+
+ax7[0].set_title(f'NIS, {insideCI.mean()*100}% inside {confprob*100}% CI\n')
+ax7[1].plot(CInorm_ranges_bearings[:N,0], '--', color='blue')
+ax7[1].plot(CInorm_ranges_bearings[:N,1], '--', color='blue')
+ax7[1].plot(NISnorm_ranges[:N], lw=0.5, color='purple')
+ax7[1].plot(NISnorm_bearings[:N], lw=0.5, color='red')
+ax7[1].legend(['CI lower', 'CI upper','NIS ranges', 'NIS bearings'])
+ax7[1].set_title(f'NIS_ranges, {insideCI_ranges.mean()*100}% inside {confprob*100}% CI\nNIS_bearings, {insideCI_bearings.mean()*100}% inside {confprob*100}% CI')
 
 
-avg_measurement_count = total_z_dimension_count/len(z)
 ANIS = np.mean(NISnorm[:N])
-CI_ANIS = np.array(chi2.interval(confprob,avg_measurement_count*N))/N
+CI_ANIS = np.array(chi2.interval(confprob,2*N))/N
 print(f"ANIS: {ANIS}")
 print(f"CI ANIS: {CI_ANIS}")
 
