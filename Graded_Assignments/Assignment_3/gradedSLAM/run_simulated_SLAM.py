@@ -96,15 +96,15 @@ K = len(z)
 M = len(landmarks)
 
 # %% Initilize
-Q = np.diag([0.1**2,0.5*2,(1*np.pi/180)**2]) #INITDONE
-R = 0.7*np.diag([0.1**2, (1*np.pi/180)**2]) #INITDONE
+Q = np.diag([0.012**2,0.009*2,(0.351*np.pi/180)**2]) #INITDONE
+R = np.diag([0.1**2, (1*np.pi/180)**2]) #INITDONE
 
 
 
 
 doAsso = True
 
-JCBBalphas = np.array([0.005, 0.005])  #INITDONE first is for joint compatibility, second is individual
+JCBBalphas = np.array([0.0001, 0.0001])  #INITDONE first is for joint compatibility, second is individual
 # these can have a large effect on runtime either through the number of landmarks created
 # or by the size of the association search space.
 
@@ -151,7 +151,7 @@ if doAssoPlot:
     figAsso, axAsso = plt.subplots(num=1, clear=True)
 
 # %% Run simulation
-N = 100
+N = 1000
 
 print("starting sim (" + str(N) + " iterations)")
 
