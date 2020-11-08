@@ -134,6 +134,8 @@ NISnorm = np.zeros(mK)
 CI = np.zeros((mK, 2))
 CInorm = np.zeros((mK, 2))
 
+
+
 # Initialize state
 eta = np.array([Lo_m[0], La_m[1], 36 * np.pi / 180]) # you might want to tweak these for a good reference
 P = np.zeros((3, 3))
@@ -144,7 +146,7 @@ t = timeOdo[0]
 
 # %%  run
 print(K)
-N = 2500#K
+N = 500#K
 
 doPlot = False
 
@@ -234,7 +236,10 @@ for k in tqdm(range(N)):
 
 # NIS
 insideCI = (CInorm[:mk, 0] <= NISnorm[:mk]) * (NISnorm[:mk] <= CInorm[:mk, 1])
-
+ANIS = np.mean(NISnorm[:N])
+CI_ANIS = np.array(chi2.interval(confidence_prob,2*N))/N
+print(f"\nANIS: {ANIS}")
+print(f"CI ANIS: {CI_ANIS}")
 fig3, ax3 = plt.subplots(num=3, clear=True)
 ax3.plot(CInorm[:mk, 0], "--")
 ax3.plot(CInorm[:mk, 1], "--")

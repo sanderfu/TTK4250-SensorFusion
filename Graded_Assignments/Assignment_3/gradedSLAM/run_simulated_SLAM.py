@@ -140,7 +140,7 @@ if doAssoPlot:
     figAsso, axAsso = plt.subplots(num=1, clear=True)
 
 # %% Run simulation
-N = 1000
+N = 100
 
 print("starting sim (" + str(N) + " iterations)")
 
@@ -233,8 +233,10 @@ ax3.plot(NISnorm[:N], lw=0.5)
 
 ax3.set_title(f'NIS, {insideCI.mean()*100}% inside {confprob*100}% CI')
 
+
+avg_measurement_count = total_z_dimension_count/len(z)
 ANIS = np.mean(NISnorm[:N])
-CI_ANIS = np.array(chi2.interval(confprob,2*N))/N
+CI_ANIS = np.array(chi2.interval(confprob,avg_measurement_count*N))/N
 print(f"ANIS: {ANIS}")
 print(f"CI ANIS: {CI_ANIS}")
 
