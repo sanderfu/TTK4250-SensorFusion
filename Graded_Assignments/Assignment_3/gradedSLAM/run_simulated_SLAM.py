@@ -151,7 +151,7 @@ if doAssoPlot:
     figAsso, axAsso = plt.subplots(num=1, clear=True)
 
 # %% Run simulation
-N = 1000
+N = 2000
 
 print("starting sim (" + str(N) + " iterations)")
 

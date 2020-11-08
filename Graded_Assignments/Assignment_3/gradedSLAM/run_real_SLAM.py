@@ -112,7 +112,7 @@ Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
 
 # %% Initilize
 #Q = np.diag([0.1**2,0.1**2,(np.pi/180)**2]) #INITDONE
-R = np.diag([2**2, (4*np.pi/180)**2]) #INITDONE
+R = np.diag([1**2, (1*np.pi/180)**2]) #INITDONE
 
 
 JCBBalphas = np.array(
@@ -183,7 +183,7 @@ for k in tqdm(range(N)):
         # seem like the prediction might be introducing some minor asymetries,
         # so best to force P symetric before update (where chol etc. is used).
         # TODO: remove this for short debug runs in order to see if there are small errors
-        P = (P + P.T) / 2
+        #P = (P + P.T) / 2
         dt = timeLsr[mk] - t
         if dt < 0:  # avoid assertions as they can be optimized avay?
             raise ValueError("negative time increment")

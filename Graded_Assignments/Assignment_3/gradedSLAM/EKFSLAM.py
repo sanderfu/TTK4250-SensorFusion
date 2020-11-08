@@ -463,9 +463,10 @@ class EKFSLAM:
 
                 # calculate NIS, can use S_cho_factors
                 v_ranges = v[::2]
-                za_ranges = za[::2]
                 v_bearings = v[1::2]
-                za_bearings = v[1::2]
+                v_ranges[1::2] = utils.wrapToPi(v_ranges[1::2])
+                v_bearings[1::2] = utils.wrapToPi(v_bearings[1::2])
+
                 
                 Sa_cho_factor_ranges = la.cho_factor(Sa[::2, ::2])
                 Sa_cho_factor_bearings = la.cho_factor(Sa[1::2, 1::2])
