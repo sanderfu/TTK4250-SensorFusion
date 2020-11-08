@@ -96,15 +96,15 @@ K = len(z)
 M = len(landmarks)
 
 # %% Initilize
-Q = 0.3*np.diag([0.01**2,0.01*2,(0.75*np.pi/180)**2]) #INITDONE
-R = np.diag([0.5**2, (2*np.pi/180)**2]) #INITDONE
+Q = np.diag([0.1**2,0.5*2,(1*np.pi/180)**2]) #INITDONE
+R = 0.7*np.diag([0.1**2, (1*np.pi/180)**2]) #INITDONE
 
 
 
 
 doAsso = True
 
-JCBBalphas = np.array([0.05, 0.05])  #INITDONE first is for joint compatibility, second is individual
+JCBBalphas = np.array([0.005, 0.005])  #INITDONE first is for joint compatibility, second is individual
 # these can have a large effect on runtime either through the number of landmarks created
 # or by the size of the association search space.
 
@@ -129,7 +129,7 @@ confprob = 1 - alpha
 
 # init
 eta_pred[0] = poseGT[0]  # we start at the correct position for reference
-P_pred[0] = 0 * np.eye(3)  # we also say that we are 100% sure about that
+P_pred[0] = 1e-4 * np.eye(3)  # we also say that we are 100% sure about that
 
 # %% Set up plotting
 # plotting
@@ -233,6 +233,12 @@ ax3.plot(NISnorm[:N], lw=0.5)
 
 ax3.set_title(f'NIS, {insideCI.mean()*100}% inside {confprob*100}% CI')
 
+ANIS = np.mean(NISnorm[:N])
+CI_ANIS = np.array(chi2.interval(confprob,2*N))/N
+print(f"ANIS: {ANIS}")
+print(f"CI ANIS: {CI_ANIS}")
+
+
 
 
 # NEES
@@ -249,7 +255,7 @@ for ax, tag, NEES, df in zip(ax4, tags, NEESes.T, dfs):
     insideCI = (CI_NEES[0] <= NEES) * (NEES <= CI_NEES[1])
     ax.set_title(f'NEES {tag}: {insideCI.mean()*100}% inside CI')
 
-    CI_ANEES = np.array(chi2.interval(alpha, df*N)) / N
+    CI_ANEES = np.array(chi2.interval(confprob, df*N)) / N
     print(f"CI ANEES {tag}: {CI_ANEES}")
     print(f"ANEES {tag}: {NEES.mean()}")
 

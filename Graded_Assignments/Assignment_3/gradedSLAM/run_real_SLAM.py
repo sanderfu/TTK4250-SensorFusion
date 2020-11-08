@@ -106,13 +106,13 @@ b = 0.5  # laser distance to the left of center
 
 car = Car(L, H, a, b)
 
-sigmas = [0.5**2,0.5**2,(5*np.pi/180)**2]
+sigmas = [0.01**2,0.05**2,(1*np.pi/180)**2]
 CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
 Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
 
 # %% Initilize
 #Q = np.diag([0.1**2,0.1**2,(np.pi/180)**2]) #INITDONE
-R = np.diag([1**2, (5*np.pi/180)**2]) #INITDONE
+R = np.diag([0.1**2, (1*np.pi/180)**2]) #INITDONE
 
 
 JCBBalphas = np.array(
@@ -144,9 +144,9 @@ t = timeOdo[0]
 
 # %%  run
 print(K)
-N = 10000#K
+N = 2500#K
 
-doPlot = True
+doPlot = False
 
 lh_pose = None
 
@@ -180,7 +180,9 @@ for k in tqdm(range(N)):
 
         t = timeLsr[mk]  # ? reset time to this laser time for next post predict
         odo = odometry(speed[k + 1], steering[k + 1], dt, car)
-        eta, P = slam.predict(eta,P,odo) # Done predict
+        
+        #Comment: Do not think the line below should be here.
+        #eta, P = slam.predict(eta,P,odo) # Done predict
 
         z = detectTrees(LASER[mk])
         eta, P, NIS[mk], a[mk] =  slam.update(eta,P,z) # TODO update
@@ -252,6 +254,7 @@ if do_raw_prediction:
         label="GPS",
     )
     ax5.plot(*odox[:N, :2].T, label="odom")
+    ax5.plot(*xupd[mk_first:mk, :2].T, label="SLAM position")
     ax5.grid()
     ax5.set_title("GPS vs odometry integration")
     ax5.legend()
