@@ -436,8 +436,8 @@ class EKFSLAM:
                 #Comment: If no assoc, good idea to set NIS = E[NIS] = DoF
                 #Comment2: A maybe better idea is to skip entirely
                 NIS = 2 # Done: beware this one when analysing consistency.
-                NIS_ranges = 2
-                NIS_bearings = 2
+                NIS_ranges = 1
+                NIS_bearings = 1
 
             else:
                 # Create the associated innovation
@@ -464,8 +464,7 @@ class EKFSLAM:
                 # calculate NIS, can use S_cho_factors
                 v_ranges = v[::2]
                 v_bearings = v[1::2]
-                v_ranges[1::2] = utils.wrapToPi(v_ranges[1::2])
-                v_bearings[1::2] = utils.wrapToPi(v_bearings[1::2])
+
 
                 
                 Sa_cho_factor_ranges = la.cho_factor(Sa[::2, ::2])
@@ -486,8 +485,8 @@ class EKFSLAM:
             a = np.full(z.shape[0], -1)
             z = z.flatten()
             NIS = 2 #Done: beware this one, you can change the value to for instance 1
-            NIS_ranges = 2
-            NIS_bearings = 2
+            NIS_ranges = 1
+            NIS_bearings = 1
             etaupd = eta
             Pupd = P
 
