@@ -45,6 +45,8 @@ class UKFSLAM:
         self.do_asso = do_asso
         self.alphas = alphas
         self.sensor_offset = sensor_offset
+        self.alpha = float(0.5)
+
 
     def f(self, x: np.ndarray, u: np.ndarray) -> np.ndarray:
         """Add the odometry u to the robot state x.
@@ -63,7 +65,7 @@ class UKFSLAM:
         """
         x_prev = x[0]
         y_prev = x[1]
-        psi_prev = x[2]
+        psi_prev = utils.wrapToPi(x[2])
         
         x = x_prev + u[0]*np.cos(psi_prev) - u[1]*np.sin(psi_prev)
         y = y_prev + u[0]*np.sin(psi_prev) + u[1]*np.cos(psi_prev)
@@ -169,13 +171,12 @@ class UKFSLAM:
         n_sig = 1 + n_dim*2
         
         beta = float(2)
-        alpha = float(1)
         k = float(3-n_dim)
-        self.lambd = math.pow(alpha, 2)*(n_dim+k) - n_dim
+        self.lambd = pow(self.alpha, 2)*(n_dim+k) - n_dim
         covar_weights = np.zeros(n_sig)
         mean_weights = np.zeros(n_sig)
         
-        covar_weights[0] = (self.lambd / (n_dim + self.lambd)) + (1 - pow(alpha, 2) + beta)
+        covar_weights[0] = (self.lambd / (n_dim + self.lambd)) + (1 - pow(self.alpha, 2) + beta)
         mean_weights[0] = (self.lambd / (n_dim + self.lambd))
 
         for i in range(1, n_sig):
@@ -201,7 +202,7 @@ class UKFSLAM:
         etapred[:3] = x_pred
         etapred[3:] = eta[3:] # Done landmarks: no effect
 
-        #Fx = self.Fx(x, z_odo)# Done
+        Fx = self.Fx(x, z_odo)# Done
 
         # evaluate covariance prediction in place to save computation
         # only robot state changes, so only rows and colums of robot state needs changing
@@ -209,6 +210,8 @@ class UKFSLAM:
         # [[P_xx, P_xm],
         # [P_mx, P_mm]]
         M = (np.shape(eta)[0] - 3)/2.0
+        F = la.block_diag(Fx, np.eye(int(M*2)))
+
         #Eq. 11.18 (they used some G without mentioning what it was, assuming identity
         P[:3, :3] = P_pred
         #P[:3, 3:] = Fx@P[:3, 3:]# Done robot-map covariance prediction
@@ -221,7 +224,7 @@ class UKFSLAM:
         assert (
             etapred.shape * 2 == P.shape
         ), "UKFSLAM.predict: calculated shapes does not match"
-        return etapred, P
+        return etapred, P, F
 
     def h(self, eta: np.ndarray) -> np.ndarray:
         """Predict all the landmark positions in sensor frame.
@@ -238,11 +241,12 @@ class UKFSLAM:
         """
         # extract states and map
         x = eta[0:3]
+        psi = utils.wrapToPi(eta[2])
         pos = x[:2].reshape((2,1))
         ## reshape map (2, #landmarks), m[:,j] is the jth landmark
         m = eta[3:].reshape((-1, 2)).T #DONE
 
-        Rot = rotmat2d(x[2])        
+        Rot = rotmat2d(psi)        
         # None as index ads an axis with size 1 at that position.
         # Numpy broadcasts size 1 dimensions to any size when needed
         delta_m = m - pos # Done, relative position of landmark to sensor on robot in world frame
@@ -265,66 +269,6 @@ class UKFSLAM:
         ), "SLAM.h: Wrong shape on zpred"
         return zpred
 
-    def H(self, eta: np.ndarray) -> np.ndarray:
-        """Calculate the jacobian of h.
-
-        Parameters
-        ----------
-        eta : np.ndarray, shape=(3 + 2 * #landmarks,)
-            The robot state and landmarks stacked.
-
-        Returns
-        -------
-        np.ndarray, shape=(2 * #landmarks, 3 + 2 * #landmarks)
-            the jacobian of h wrt. eta.
-        """
-        # extract states and map
-        x = eta[0:3]
-        pos = x[:2].reshape((2,1))
-        ## reshape map (2, #landmarks), m[:,j] is the jth landmark
-        m = eta[3:].reshape((-1, 2)).T
-
-        numM = m.shape[1]
-
-        Rot = rotmat2d(x[2])
-
-        delta_m = m - pos  #DONE, relative position of landmark to robot in world frame. m - rho that appears in (11.15) and (11.16)
-
-        zc = delta_m - Rot@self.sensor_offset.reshape((2,1)) #DONE, (2, #measurements), each measured position in cartesian coordinates like
-        # [x coordinates;
-        #  y coordinates]
-        Rpihalf = rotmat2d(np.pi / 2)
-        
-        
-        # Allocate H and set submatrices as memory views into H
-        # You may or may not want to do this like this
-        H = np.zeros((2 * numM, 3 + 2 * numM)) #DONE, see eq (11.15), (11.16), (11.17)
-        Hx = H[:, :3]  # slice view, setting elements of Hx will set H as well
-        Hm = H[:, 3:]  # slice view, setting elements of Hm will set H as well
-
-        for i in range(numM):
-            zc_i = zc[:,i]
-            delta_mi = delta_m[:,i]
-            zrange = zc_i.T/la.norm(zc_i,2)@np.hstack((-np.eye(2), np.array(-Rpihalf@delta_mi).reshape(2,1)))
-            zbearing = zc_i.T@Rpihalf.T/la.norm(zc_i, 2)**2 @ np.hstack((-np.eye(2), np.array(-Rpihalf@delta_mi).reshape(2,1)))
-            zpred_i = np.vstack((zrange,zbearing))
-            #Note: zpred_i = H_x^i
-            H_xi = zpred_i
-            H_mi = -H_xi[:,:2]
-            
-            assert (np.shape(H_xi)==np.shape(Hx[2*i:2*i+2,:])), "Hfunc, H_xi incorrect shape"
-            assert (np.shape(H_mi)==np.shape(Hm[2*i:2*i+2,2*i:2*i+2])), "Hfunc, H_mi incorrect shape"
-
-            #Placing H_xi and H_mi in H
-            Hx[2*i:2*i+2,:]=H_xi
-            Hm[2*i:2*i+2,2*i:2*i+2]=H_mi
-
-        # In what follows you can be clever and avoid making this for all the landmarks you _know_
-        # you will not detect (the maximum range should be available from the data).
-        # But keep it simple to begin with.
-        assert(np.shape(H) == (2*numM, 3+ 2*numM))
-        # TONO: You can set some assertions here to make sure that some of the structure in H is correct
-        return H
 
     def add_landmarks(
         self, eta: np.ndarray, P: np.ndarray, z: np.ndarray
@@ -470,7 +414,6 @@ class UKFSLAM:
         """
         numLmk = (eta.size - 3) // 2
         assert (len(eta) - 3) % 2 == 0, "UKFSLAM.update: landmark lenght not even"
-
         if numLmk > 0:
             # Prediction and innovation covariance
             
@@ -486,13 +429,12 @@ class UKFSLAM:
             n_sig = 1 + n_dim*2
             
             beta = float(2)
-            alpha = float(0.1)
             k = float(3-n_dim)
-            self.lambd = math.pow(alpha, 2)*(n_dim+k) - n_dim
+            self.lambd = math.pow(self.alpha, 2)*(n_dim+k) - n_dim
             covar_weights = np.zeros(n_sig)
             mean_weights = np.zeros(n_sig)
             
-            covar_weights[0] = (self.lambd / (n_dim + self.lambd)) + (1 - pow(alpha, 2) + beta)
+            covar_weights[0] = (self.lambd / (n_dim + self.lambd)) + (1 - pow(self.alpha, 2) + beta)
             mean_weights[0] = (self.lambd / (n_dim + self.lambd))
 
             for i in range(1, n_sig):
@@ -514,9 +456,10 @@ class UKFSLAM:
             R_large = np.kron(np.eye(m//2),self.R)
             S_upd += R_large
             
+            z = z.ravel()  # 2D -> flat
 
     
-            za, zpred, Sa, assoc = self.associate(z.ravel(), z_upd, S_upd)
+            za, zpred, Sa, assoc = self.associate(z, z_upd, S_upd)
                     
             if za.shape[0] == 0:
                 etaupd = eta #Done
@@ -525,18 +468,22 @@ class UKFSLAM:
                 #Comment2: A maybe better idea is to skip entirely
                 NIS = 2 # Done: beware this one when analysing consistency.
             else:
+                
+                zbarinds = np.empty_like(za, dtype=int)
+                zbarinds[::2] = 2 * assoc[assoc > -1]
+                zbarinds[1::2] = 2 * assoc[assoc > -1] + 1
+                
                 Sigma_upd = np.zeros((n_dim, np.shape(Sa)[0]))
-                sigmas_out_post_assoc = np.zeros(n_sig, len(assoc))
-                for i in range(len(assoc)):
-                    if assoc[i] != -1:
-                        sigmas_out_pos_assoc[]
+                
                 for i in range(n_sig):
-                    left_diff = sigmas[i]-eta
-                    right_diff = sigmas_out[i]-zpred
+                    left_diff = sigmas[i] - eta #wrong index here... 
+                    right_diff = sigmas_out[i][zbarinds]-zpred
                     Sigma_upd += covar_weights[i]*np.outer(left_diff, right_diff)
-                    kalman_gain = Sigma_upd@np.linalg.inv(Sa)
+                kalman_gain = Sigma_upd@np.linalg.inv(Sa)
                
                 v = za.ravel()-zpred
+                v[1::2] = utils.wrapToPi(v[1::2])
+
                 etaupd = eta + kalman_gain@(v)
                 Pupd = P - kalman_gain@Sa@kalman_gain.T
                 # Kalman mean update

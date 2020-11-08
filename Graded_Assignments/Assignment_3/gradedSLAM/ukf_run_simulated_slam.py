@@ -87,6 +87,8 @@ except Exception as e:
 
 
 from UKFSLAM import UKFSLAM
+from EKFSLAM import EKFSLAM
+
 from plotting import ellipse
 
 # %% Load data
@@ -105,12 +107,12 @@ landmarks = simSLAM_ws["landmarks"].T
 odometry = simSLAM_ws["odometry"].T
 poseGT = simSLAM_ws["poseGT"].T
 pose_dim = len(poseGT[0])
-K = len(z)
+K = 300 #len(z)
 M = len(landmarks)
 
 # %% Initilize
-Q = np.diag([0.1**2,0.1**2,(np.pi/180)**2]) #INITDONE
-R = np.diag([1**2, (5*np.pi/180)**2]) #INITDONE
+Q = np.diag([0.4**2,0.4**2,(0.9*np.pi/180)**2]) #INITDONE
+R = np.diag([0.1**2, (5*np.pi/180)**2]) #INITDONE
 
 doAsso = True
 
@@ -118,11 +120,13 @@ JCBBalphas = np.array([0.05, 0.05])  #INITDONE first is for joint compatibility,
 # these can have a large effect on runtime either through the number of landmarks created
 # or by the size of the association search space.
 
-slam = UKFSLAM(Q, R, do_asso=doAsso, alphas=JCBBalphas)
-
+ukfslam = UKFSLAM(Q, R, do_asso=doAsso, alphas=JCBBalphas)
+ekfslam = EKFSLAM(Q, R, do_asso=doAsso, alphas=JCBBalphas)
 # allocate
 eta_pred: List[Optional[np.ndarray]] = [None] * K
 P_pred: List[Optional[np.ndarray]] = [None] * K
+F: List[Optional[np.ndarray]] = [None] * K
+
 eta_hat: List[Optional[np.ndarray]] = [None] * K
 P_hat: List[Optional[np.ndarray]] = [None] * K
 a: List[Optional[np.ndarray]] = [None] * K
@@ -134,6 +138,7 @@ NEESes = np.zeros((K, 3))
 
 # For consistency testing
 alpha = 0.05
+confprob = 1 - alpha
 
 # init
 eta_pred[0] = poseGT[0]  # we start at the correct position for reference
@@ -148,17 +153,21 @@ if doAssoPlot:
     figAsso, axAsso = plt.subplots(num=1, clear=True)
 
 # %% Run simulation
-N = 100
+N = K
 
 print("starting sim (" + str(N) + " iterations)")
 
 for k, z_k in tqdm(enumerate(z[:N])):
 
-    eta_hat[k], P_hat[k], NIS[k], a[k] = slam.update(eta_pred[k],P_pred[k],z_k)
+    eta_hat[k], P_hat[k], NIS[k], a[k] = ekfslam.update(eta_pred[k],P_pred[k],z_k)
+   
 
     if k < K - 1:
-        eta_pred[k + 1], P_pred[k + 1] = slam.predict(eta_hat[k],P_hat[k],odometry[k])
-
+        eta_pred[k + 1], P_pred[k + 1], F[k+1] = ukfslam.predict(eta_hat[k],P_hat[k],odometry[k])
+        if not np.all(
+            np.linalg.eigvals(P_pred[k+1]) >= 0
+        ):
+            eta_pred[k + 1], P_pred[k + 1] = ekfslam.predict(eta_hat[k],P_hat[k],odometry[k])
     assert (
         eta_hat[k].shape[0] == P_hat[k].shape[0]
     ), "dimensions of mean and covariance do not match"
@@ -173,12 +182,12 @@ for k, z_k in tqdm(enumerate(z[:N])):
     else:
         NISnorm[k] = 1
         CInorm[k].fill(1)
-    NEESes[k] = slam.NEESes(eta_hat[k][:pose_dim],P_hat[k][:pose_dim, :pose_dim],poseGT[k]) #Done, use provided function slam.NEESes
+    NEESes[k] = ekfslam.NEESes(eta_hat[k][:pose_dim],P_hat[k][:pose_dim, :pose_dim],poseGT[k]) #Done, use provided function slam.NEESes
 
     if doAssoPlot and k > 0:
         axAsso.clear()
         axAsso.grid()
-        zpred = slam.h(eta_pred[k]).reshape(-1, 2)
+        zpred = ukfslam.h(eta_pred[k]).reshape(-1, 2)
         axAsso.scatter(z_k[:, 0], z_k[:, 1], label="z")
         axAsso.scatter(zpred[:, 0], zpred[:, 1], label="zpred")
         xcoords = np.block([[z_k[a[k] > -1, 0]], [zpred[a[k][a[k] > -1], 0]]]).T
@@ -192,7 +201,8 @@ for k, z_k in tqdm(enumerate(z[:N])):
 
 
 print("sim complete")
-
+from smoother import rts_smooth
+eta_better, P_better = rts_smooth(eta_pred, P_pred, eta_hat, P_hat, F)
 pose_est = np.array([x[:3] for x in eta_hat[:N]])
 lmk_est = [eta_hat_k[3:].reshape(-1, 2) for eta_hat_k in eta_hat[:N]]
 lmk_est_final = lmk_est[N - 1]
@@ -217,12 +227,18 @@ ax2.scatter(*lmk_est_final.T, c="b", marker=".")
 for l, lmk_l in enumerate(lmk_est_final):
     idxs = slice(3 + 2 * l, 3 + 2 * l + 2)
     rI = P_hat[N - 1][idxs, idxs]
-    el = ellipse(lmk_l, rI, 5, 200)
-    ax2.plot(*el.T, "b")
+    try:
+        el = ellipse(lmk_l, rI, 5, 200)
+        ax2.plot(*el.T, "b")
+    except:
+        pass
 
 ax2.plot(*poseGT.T[:2], c="r", label="gt")
 ax2.plot(*pose_est.T[:2], c="g", label="est")
-ax2.plot(*ellipse(pose_est[-1, :2], P_hat[N - 1][:2, :2], 5, 200).T, c="g")
+try:
+    ax2.plot(*ellipse(pose_est[-1, :2], P_hat[N - 1][:2, :2], 5, 200).T, c="g")
+except:
+    pass
 ax2.set(title="results", xlim=(mins[0], maxs[0]), ylim=(mins[1], maxs[1]))
 ax2.axis("equal")
 ax2.grid()
@@ -246,7 +262,7 @@ tags = ['all', 'pos', 'heading']
 dfs = [3, 2, 1]
 
 for ax, tag, NEES, df in zip(ax4, tags, NEESes.T, dfs):
-    CI_NEES = chi2.interval(alpha, df)
+    CI_NEES = chi2.interval(confprob, df)
     ax.plot(np.full(N, CI_NEES[0]), '--')
     ax.plot(np.full(N, CI_NEES[1]), '--')
     ax.plot(NEES[:N], lw=0.5)
@@ -310,11 +326,14 @@ if playMovie:
             for l, lmk_l in enumerate(lmk_est[k]):
                 idxs = slice(3 + 2 * l, 3 + 2 * l + 2)
                 rI = P_hat[k][idxs, idxs]
-                el = ellipse(lmk_l, rI, 5, 200)
-                ax_movie.plot(*el.T, "b")
+                try:
+                    el = ellipse(lmk_l, rI, 5, 200)
+                    ax_movie.plot(*el.T, "b")
+                except Exception as e:
+                    pass
 
             camera.snap()
-        animation = camera.animate(interval=100, blit=True, repeat=False)
+        animation = camera.animate(interval=10, blit=True, repeat=False)
         print("playing movie")
 
     except ImportError:
