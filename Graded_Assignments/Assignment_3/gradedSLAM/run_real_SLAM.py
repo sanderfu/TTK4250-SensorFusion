@@ -106,7 +106,7 @@ b = 0.5  # laser distance to the left of center
 
 car = Car(L, H, a, b)
 
-sigmas = [0.01**2,0.05**2,(1*np.pi/180)**2]
+sigmas = [0.012**2,0.009**2,(0.351*np.pi/180)**2]
 CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
 Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
 
@@ -154,7 +154,7 @@ t = timeOdo[0]
 
 # %%  run
 print(K)
-N = 2000#K
+N = 10000#K
 
 doPlot = False
 
