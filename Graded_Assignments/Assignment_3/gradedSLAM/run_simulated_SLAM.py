@@ -195,6 +195,8 @@ for k, z_k in tqdm(enumerate(z[:N])):
         CInorm[k].fill(1)
         CInorm_ranges_bearings[k].fill(1)
     NEESes[k] = slam.NEESes(eta_hat[k][:pose_dim],P_hat[k][:pose_dim, :pose_dim],poseGT[k]) #Done, use provided function slam.NEESes
+    #slam.associate(z,landmarks,0*np.eye(3),0*np.eye(3))
+    #NEESmap = 
 
     if doAssoPlot and k > 0:
         axAsso.clear()

@@ -126,17 +126,17 @@ b = 0.5  # laser distance to the left of center
 
 car = Car(L, H, a, b)
 
-sigmas = [0.5,0.8,(0.8*np.pi/180)]
+sigmas = [1,0.8,(0.16*np.pi/180)]
 CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
 Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
 
 # %% Initilize
 #Q = np.diag([0.1**2,0.1**2,(np.pi/180)**2]) #INITDONE
-R = np.diag([0.1**2, (0.1*np.pi/180)**2]) #INITDONE
+R = np.diag([0.05**2, (0.2*np.pi/180)**2]) #INITDONE
 
 
 JCBBalphas = np.array(
-   [0.0005, 0.0005] # INITDONE
+   [1e-7, 1e-7] # INITDONE
 )
 sensorOffset = np.array([car.a + car.L, car.b])
 doAsso = True
@@ -167,7 +167,7 @@ CInorm_ranges_bearings = np.zeros((mK, 2))
 
 # Initialize state
 eta = np.array([Lo_m[0], La_m[1], 36 * np.pi / 180]) # you might want to tweak these for a good reference
-P = 0*np.eye(3)
+P = 1e-5*np.eye(3)
 P_cached = np.copy(P)
 
 mk_first = 1  # first seems to be a bit off in timing
@@ -176,7 +176,7 @@ t = timeOdo[0]
 
 # %%  run
 print(K)
-N = 10000#K
+N = 6000#K
 
 doPlot = False
 
@@ -203,7 +203,7 @@ if do_raw_prediction:  # TODO: further processing such as plotting
 
 assert np.allclose(P,P_cached), "P has been modified in function!!"
 squared_error = 0
-do_gnss_update = True
+do_gnss_update = False
 k_gnss = 0
 R_gnss = np.diag([0.3**2,0.3**2])
 for k in tqdm(range(N)):
@@ -278,10 +278,9 @@ for k in tqdm(range(N)):
     if k_gnss < Kgps-1 and timeGps[k_gnss]<=timeOdo[k+1]:
         z_gnss = np.array([Lo_m[k_gnss], La_m[k_gnss]])
         squared_error += la.norm(eta[:2]-z_gnss, 2)**2
-
+        k_gnss+=1
         if do_gnss_update:
             eta, P =  slam.updateGNSS(eta, P, z_gnss, R_gnss) # Done update
-            k_gnss +=1
     if k < K - 1:
         dt = timeOdo[k + 1] - t
         t = timeOdo[k + 1]
@@ -290,6 +289,7 @@ for k in tqdm(range(N)):
 
 
 #RMSE for pose, where GT is GPS measurements
+
 RMSE = np.sqrt(squared_error/k_gnss)
 
 # %% Consistency
