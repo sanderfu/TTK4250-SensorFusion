@@ -106,13 +106,13 @@ b = 0.5  # laser distance to the left of center
 
 car = Car(L, H, a, b)
 
-sigmas = [0.012**2,0.009**2,(0.351*np.pi/180)**2]
+sigmas = [0.012,0.009,(0.351*np.pi/180)]
 CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
 Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
 
 # %% Initilize
 #Q = np.diag([0.1**2,0.1**2,(np.pi/180)**2]) #INITDONE
-R = np.diag([0.1**2, (1*np.pi/180)**2]) #INITDONE
+R = np.diag([0.1**2, (0.1*np.pi/180)**2]) #INITDONE
 
 
 JCBBalphas = np.array(
@@ -146,7 +146,8 @@ CInorm_ranges_bearings = np.zeros((mK, 2))
 
 # Initialize state
 eta = np.array([Lo_m[0], La_m[1], 36 * np.pi / 180]) # you might want to tweak these for a good reference
-P = np.zeros((3, 3))
+P = 0.1*np.eye(3)
+P_cached = np.copy(P)
 
 mk_first = 1  # first seems to be a bit off in timing
 mk = mk_first
@@ -154,7 +155,7 @@ t = timeOdo[0]
 
 # %%  run
 print(K)
-N = 10000#K
+N = 2500#K
 
 doPlot = False
 
@@ -167,6 +168,8 @@ if doPlot:
     sh_lmk = ax.scatter(np.nan, np.nan, c="r", marker="x")
     sh_Z = ax.scatter(np.nan, np.nan, c="b", marker=".")
 
+
+#Warning: slam.predict modifies the P function it takes in, and without using np.copy this is a shallow copy meaning we modify the original!
 do_raw_prediction = True
 if do_raw_prediction:  # TODO: further processing such as plotting
     odos = np.zeros((K, 3))
@@ -175,7 +178,10 @@ if do_raw_prediction:  # TODO: further processing such as plotting
 
     for k in range(min(N, K - 1)):
         odos[k + 1] = odometry(speed[k + 1], steering[k + 1], 0.025, car)
-        odox[k + 1], _ = slam.predict(odox[k], P, odos[k + 1])
+        odox[k + 1], _ = slam.predict(odox[k], np.copy(P), odos[k + 1])
+
+assert np.allclose(P,P_cached), "P has been modified in function!!"
+
 
 for k in tqdm(range(N)):
     if mk < mK - 1 and timeLsr[mk] <= timeOdo[k + 1]:
