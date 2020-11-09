@@ -282,7 +282,7 @@ ax7[1].set_title(f'NIS_ranges, {insideCI_ranges.mean()*100}% inside {confprob*10
 
 
 ANIS = np.mean(NISnorm[:N])
-CI_ANIS = np.array(chi2.interval(confprob,2*N))/N
+CI_ANIS = np.array(chi2.interval(confprob,N))/N
 print(f"ANIS: {ANIS}")
 print(f"CI ANIS: {CI_ANIS}")
 
