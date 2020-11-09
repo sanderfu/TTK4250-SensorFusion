@@ -15,13 +15,24 @@ except ImportError as e:
 
 import numpy as np
 from EKFSLAM import EKFSLAM
-from UKFSLAM import UKFSLAM
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import animation
 from plotting import ellipse
 from vp_utils import detectTrees, odometry, Car
 from utils import rotmat2d
+from EKFSLAM import EKFSLAM
+from UKFSLAM import UKFSLAM
+
+#Imports for multithreading and logging results
+import logging
+import threading
+from zipfile import ZipFile
+import datetime
+import re
+import os
+
+save_results=True
 
 # %% plot config check and style setup
 
@@ -56,8 +67,6 @@ try:
     plt.style.use(plt_styles)
     print(f"pyplot using style set {plt_styles}")
 except Exception as e:
-    print(e)
-    print("setting grid and only grid and legend manually")
     plt.rcParams.update(
         {
             # setgrid
@@ -65,12 +74,23 @@ except Exception as e:
             "grid.linestyle": ":",
             "grid.color": "k",
             "grid.alpha": 0.5,
-            "grid.linewidth": 0.5,
+            "grid.linewidth": 1,
             # Legend
             "legend.frameon": True,
             "legend.framealpha": 1.0,
             "legend.fancybox": True,
             "legend.numpoints": 1,
+            "legend.loc" : "upper right",
+            'legend.fontsize': 10,
+            # Font
+            "font.size" : 15,
+            #Subplots and figure
+            "figure.figsize" : [8,7],
+            "figure.subplot.wspace" : 0.37,
+            "figure.subplot.hspace" : 0.41,
+            "figure.subplot.top" : 0.9,
+            "figure.subplot.right" : 0.95,
+            "figure.subplot.left" : 0.1,
         }
     )
 
@@ -107,27 +127,30 @@ b = 0.5  # laser distance to the left of center
 
 car = Car(L, H, a, b)
 
-sigmas = 0.1*np.array([0.4**2,0.4**2,(4*np.pi/180)**2])
+sigmas = [0.01,0.008,(0.08*np.pi/180)]
 CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
 Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
 
 # %% Initilize
 #Q = np.diag([0.1**2,0.1**2,(np.pi/180)**2]) #INITDONE
-R = np.diag([1**2, (5*np.pi/180)**2])*0.1 #INITDONE
+R = np.diag([0.1**2, (0.1*np.pi/180)**2]) #INITDONE
 
 
 JCBBalphas = np.array(
-   [0.05, 0.05] # INITDONE
+   [0.0001, 0.0001] # INITDONE
 )
 sensorOffset = np.array([car.a + car.L, car.b])
 doAsso = True
 
-ekfslam = EKFSLAM(Q, R, do_asso=doAsso, alphas=JCBBalphas, sensor_offset=sensorOffset)
-ukfslam = EKFSLAM(Q, R, do_asso=doAsso, alphas=JCBBalphas, sensor_offset=sensorOffset)
+slam = EKFSLAM(Q, R, do_asso=doAsso, alphas=JCBBalphas, sensor_offset=sensorOffset)
 
 # For consistency testing
 alpha = 0.05
 confidence_prob = 1 - alpha
+
+
+ekfslam = EKFSLAM(Q, R, do_asso=doAsso, alphas=JCBBalphas, sensor_offset=sensorOffset)
+ukfslam = EKFSLAM(Q, R, do_asso=doAsso, alphas=JCBBalphas, sensor_offset=sensorOffset)
 
 xupd = np.zeros((mK, 3))
 a = [None] * mK
@@ -136,9 +159,19 @@ NISnorm = np.zeros(mK)
 CI = np.zeros((mK, 2))
 CInorm = np.zeros((mK, 2))
 
+NIS_ranges = np.zeros(mK)
+NIS_bearings = np.zeros(mK)
+NISnorm_ranges = np.zeros(mK)
+NISnorm_bearings = np.zeros(mK)
+
+CI_ranges_bearings = np.zeros((mK, 2))
+CInorm_ranges_bearings = np.zeros((mK, 2))
+
+
 # Initialize state
 eta = np.array([Lo_m[0], La_m[1], 36 * np.pi / 180]) # you might want to tweak these for a good reference
-P = np.zeros((3, 3))
+P = 0*np.eye(3)
+P_cached = np.copy(P)
 
 mk_first = 1  # first seems to be a bit off in timing
 mk = mk_first
@@ -146,7 +179,7 @@ t = timeOdo[0]
 
 # %%  run
 print(K)
-N = 5000#K
+N = 4000#K
 
 doPlot = False
 
@@ -159,6 +192,8 @@ if doPlot:
     sh_lmk = ax.scatter(np.nan, np.nan, c="r", marker="x")
     sh_Z = ax.scatter(np.nan, np.nan, c="b", marker=".")
 
+
+#Warning: slam.predict modifies the P function it takes in, and without using np.copy this is a shallow copy meaning we modify the original!
 do_raw_prediction = True
 if do_raw_prediction:  # TODO: further processing such as plotting
     odos = np.zeros((K, 3))
@@ -167,15 +202,18 @@ if do_raw_prediction:  # TODO: further processing such as plotting
 
     for k in range(min(N, K - 1)):
         odos[k + 1] = odometry(speed[k + 1], steering[k + 1], 0.025, car)
-        odox[k + 1], _ = ukfslam.predict(odox[k], P, odos[k + 1])
-        
+        odox[k + 1], _ = ekfslam.predict(odox[k], np.copy(P), odos[k + 1])
+
+assert np.allclose(P,P_cached), "P has been modified in function!!"
+
+
 for k in tqdm(range(N)):
     if mk < mK - 1 and timeLsr[mk] <= timeOdo[k + 1]:
         # Force P to symmetric: there are issues with long runs (>10000 steps)
         # seem like the prediction might be introducing some minor asymetries,
         # so best to force P symetric before update (where chol etc. is used).
         # TODO: remove this for short debug runs in order to see if there are small errors
-        P = (P + P.T) / 2
+        #P = (P + P.T) / 2
         dt = timeLsr[mk] - t
         if dt < 0:  # avoid assertions as they can be optimized avay?
             raise ValueError("negative time increment")
@@ -183,20 +221,33 @@ for k in tqdm(range(N)):
         t = timeLsr[mk]  # ? reset time to this laser time for next post predict
         odo = odometry(speed[k + 1], steering[k + 1], dt, car)
         
+        #Comment: Do not think the line below should be here.
+        #eta, P = slam.predict(eta,P,odo) # Done predict
 
         z = detectTrees(LASER[mk])
-        eta, P, NIS[mk], a[mk] =  ekfslam.update(eta,P,z) # Done update
+        eta, P, NIS[mk], NIS_ranges[mk], NIS_bearings[mk], a[mk] =  ekfslam.update(eta,P,z) # TODO update
 
         num_asso = np.count_nonzero(a[mk] > -1)
 
         if num_asso > 0:
             NISnorm[mk] = NIS[mk] / (2 * num_asso)
+            NISnorm_ranges[mk] = NIS_ranges[mk] /num_asso
+            NISnorm_bearings[mk] = NIS_bearings[mk]/num_asso
+            
             CInorm[mk] = np.array(chi2.interval(confidence_prob, 2 * num_asso)) / (
                 2 * num_asso
+            )            
+            CInorm_ranges_bearings[mk] = np.array(chi2.interval(confidence_prob, num_asso)) / (
+                num_asso
             )
         else:
             NISnorm[mk] = 1
+            NISnorm_ranges[mk] = 1
+            NISnorm_bearings[mk] = 1
+            
             CInorm[mk].fill(1)
+
+            CInorm_ranges_bearings[mk].fill(1)
 
         xupd[mk] = eta[:3]
 
@@ -207,7 +258,7 @@ for k in tqdm(range(N)):
                     rotmat2d(eta[2])
                     @ (
                         z[:, 0] * np.array([np.cos(z[:, 1]), np.sin(z[:, 1])])
-                        + ekfslam.sensor_offset[:, None]
+                        + slam.sensor_offset[:, None]
                     )
                     + eta[0:2, None]
                 )
@@ -233,18 +284,39 @@ for k in tqdm(range(N)):
             np.linalg.eigvals(P) >= 0
         ):
             eta, P = ekfslam.predict(eta,P,odo) # Done predict
-
 # %% Consistency
 
 # NIS
+confprob = confidence_prob
 insideCI = (CInorm[:mk, 0] <= NISnorm[:mk]) * (NISnorm[:mk] <= CInorm[:mk, 1])
-
+ANIS = np.mean(NISnorm[:mk])
+CI_ANIS = np.array(chi2.interval(confidence_prob,2*mk))/mk
+print(f"\nANIS: {ANIS}")
+print(f"CI ANIS: {CI_ANIS}")
 fig3, ax3 = plt.subplots(num=3, clear=True)
 ax3.plot(CInorm[:mk, 0], "--")
 ax3.plot(CInorm[:mk, 1], "--")
 ax3.plot(NISnorm[:mk], lw=0.5)
 
 ax3.set_title(f"NIS, {insideCI.mean()*100:.2f}% inside CI")
+insideCI_ranges = (CInorm_ranges_bearings[:mk,0] <= NISnorm_ranges[:mk]) * (NISnorm_ranges[:mk] <= CInorm_ranges_bearings[:mk,1])
+insideCI_bearings = (CInorm_ranges_bearings[:mk,0] <= NISnorm_bearings[:mk]) * (NISnorm_bearings[:mk] <= CInorm_ranges_bearings[:mk,1])
+
+fig7, ax7 = plt.subplots(nrows=2, ncols=1,num=7, clear=True)
+
+ax7[0].plot(CInorm[:mk,0], '--')
+ax7[0].plot(CInorm[:mk,1], '--')
+ax7[0].plot(NISnorm[:mk], lw=0.5)
+
+ax7[0].legend(['CI lower', 'CI upper', 'NIS'])
+
+ax7[0].set_title(f'NIS, {np.round(insideCI.mean()*100,2)}% inside {confprob*100}% CI\n')
+ax7[1].plot(CInorm_ranges_bearings[:mk,0], '--', color='blue')
+ax7[1].plot(CInorm_ranges_bearings[:mk,1], '--', color='blue')
+ax7[1].plot(NISnorm_ranges[:mk], lw=0.5, color='purple')
+ax7[1].plot(NISnorm_bearings[:mk], lw=0.5, color='red')
+ax7[1].legend(['CI lower', 'CI upper','NIS ranges', 'NIS bearings'])
+ax7[1].set_title(f'NIS_ranges, {np.round(insideCI_ranges.mean()*100,2)}% inside {confprob*100}% CI\nNIS_bearings, {np.round(insideCI_bearings.mean()*100,2)}% inside {confprob*100}% CI')
 
 # %% slam
 
@@ -258,9 +330,8 @@ if do_raw_prediction:
         label="GPS",
     )
     ax5.plot(*odox[:N, :2].T, label="odom")
+    ax5.plot(*xupd[mk_first:mk, :2].T, label="SLAM position")
     ax5.grid()
-    ax5.plot(*xupd[mk_first:mk, :2].T)
-
     ax5.set_title("GPS vs odometry integration")
     ax5.legend()
 
@@ -271,9 +342,24 @@ ax6.plot(*xupd[mk_first:mk, :2].T)
 ax6.set(
     title=f"Steps {k}, laser scans {mk-1}, landmarks {len(eta[3:])//2},\nmeasurements {z.shape[0]}, num new = {np.sum(a[mk] == -1)}"
 )
-plt.show()
 
-# %%
+
+# %% Save plots
+the_time = str(datetime.datetime.now())
+the_time = re.sub(r':',r';', the_time)
+the_time = re.sub(r' ',r'_', the_time)
+print(the_time)
+
+if save_results:
+    zipObj = ZipFile(f"test_real{the_time}.zip", 'w')
+    for i in plt.get_fignums():
+        filename = f"fig_real{i}{the_time}.pdf"
+        plt.figure(i)
+        plt.savefig(filename)
+        zipObj.write(filename)
+        os.remove(filename)
+    zipObj.close()
+
 
 
 plt.show()
