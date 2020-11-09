@@ -21,7 +21,7 @@ from matplotlib import animation
 from plotting import ellipse
 from vp_utils import detectTrees, odometry, Car
 from utils import rotmat2d
-
+import scipy.linalg as la
 
 #Imports for multithreading and logging results
 import logging
@@ -126,7 +126,7 @@ b = 0.5  # laser distance to the left of center
 
 car = Car(L, H, a, b)
 
-sigmas = [0.1,0.08,(0.08*np.pi/180)]
+sigmas = [0.5,0.8,(0.8*np.pi/180)]
 CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
 Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
 
@@ -136,7 +136,7 @@ R = np.diag([0.1**2, (0.1*np.pi/180)**2]) #INITDONE
 
 
 JCBBalphas = np.array(
-   [1e-5, 1e-5] # INITDONE
+   [0.0005, 0.0005] # INITDONE
 )
 sensorOffset = np.array([car.a + car.L, car.b])
 doAsso = True
@@ -159,6 +159,7 @@ NIS_ranges = np.zeros(mK)
 NIS_bearings = np.zeros(mK)
 NISnorm_ranges = np.zeros(mK)
 NISnorm_bearings = np.zeros(mK)
+#NISgnss = np.zeros(Kgps)
 
 CI_ranges_bearings = np.zeros((mK, 2))
 CInorm_ranges_bearings = np.zeros((mK, 2))
@@ -175,7 +176,7 @@ t = timeOdo[0]
 
 # %%  run
 print(K)
-N = 4000#K
+N = 10000#K
 
 doPlot = False
 
@@ -201,9 +202,13 @@ if do_raw_prediction:  # TODO: further processing such as plotting
         odox[k + 1], _ = slam.predict(odox[k], np.copy(P), odos[k + 1])
 
 assert np.allclose(P,P_cached), "P has been modified in function!!"
-
-
+squared_error = 0
+do_gnss_update = True
+k_gnss = 0
+R_gnss = np.diag([0.3**2,0.3**2])
 for k in tqdm(range(N)):
+    
+
     if mk < mK - 1 and timeLsr[mk] <= timeOdo[k + 1]:
         # Force P to symmetric: there are issues with long runs (>10000 steps)
         # seem like the prediction might be introducing some minor asymetries,
@@ -270,15 +275,24 @@ for k in tqdm(range(N)):
             plt.pause(0.00001)
 
         mk += 1
+    if k_gnss < Kgps-1 and timeGps[k_gnss]<=timeOdo[k+1]:
+        z_gnss = np.array([Lo_m[k_gnss], La_m[k_gnss]])
+        squared_error += la.norm(eta[:2]-z_gnss, 2)**2
 
+        if do_gnss_update:
+            eta, P =  slam.updateGNSS(eta, P, z_gnss, R_gnss) # Done update
+            k_gnss +=1
     if k < K - 1:
         dt = timeOdo[k + 1] - t
         t = timeOdo[k + 1]
         odo = odometry(speed[k + 1], steering[k + 1], dt, car)
         eta, P = slam.predict(eta, P, odo)
 
-# %% Consistency
 
+#RMSE for pose, where GT is GPS measurements
+RMSE = np.sqrt(squared_error/k_gnss)
+
+# %% Consistency
 # NIS
 confprob = confidence_prob
 insideCI = (CInorm[:mk, 0] <= NISnorm[:mk]) * (NISnorm[:mk] <= CInorm[:mk, 1])
@@ -325,7 +339,7 @@ if do_raw_prediction:
     ax5.plot(*odox[:N, :2].T, label="odom")
     ax5.plot(*xupd[mk_first:mk, :2].T, label="SLAM position")
     ax5.grid()
-    ax5.set_title("GPS vs odometry integration")
+    ax5.set_title(f"GPS vs odometry integration, vs pose estimated. \nTotal RMSE for pose: {RMSE}")
     ax5.legend()
 
 # %%

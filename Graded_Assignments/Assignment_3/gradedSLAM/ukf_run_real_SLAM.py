@@ -208,6 +208,7 @@ assert np.allclose(P,P_cached), "P has been modified in function!!"
 
 
 for k in tqdm(range(N)):
+    
     if mk < mK - 1 and timeLsr[mk] <= timeOdo[k + 1]:
         # Force P to symmetric: there are issues with long runs (>10000 steps)
         # seem like the prediction might be introducing some minor asymetries,

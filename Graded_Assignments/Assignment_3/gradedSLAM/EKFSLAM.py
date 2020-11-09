@@ -504,7 +504,45 @@ class EKFSLAM:
         assert np.all(np.linalg.eigvals(Pupd) >= 0), "EKFSLAM.update: Pupd must be PSD"
 
         return etaupd, Pupd, NIS, NIS_ranges, NIS_bearings, a
+    def updateGNSS(
+        self, eta: np.ndarray, P: np.ndarray, z: np.ndarray, R_gnss
+    ) -> Tuple[np.ndarray, np.ndarray, float, np.ndarray]:
+        """Update eta and P with z, associating landmarks and adding new ones.
 
+        Parameters
+        ----------
+        eta : np.ndarray
+            [description]
+        P : np.ndarray
+            [description]
+        z : np.ndarray, shape=(#detections, 2)
+            [description]
+
+        Returns
+        -------
+        Tuple[np.ndarray, np.ndarray, float, np.ndarray]
+            [description]
+        """
+        
+        zpred = eta[:2] #Done
+        H = np.hstack([np.eye(2), np.zeros(( 2, len(eta)-2))])
+   
+        S = H@P@H.T+R_gnss
+
+        v = z - zpred  
+
+        S_cho_factor = la.cho_factor(S)
+
+        W = P@la.cho_solve(S_cho_factor,H).T    #Done, Kalman gain, can use S_cho_factors
+        etaupd = eta + W@v #Done, Kalman update
+        
+        # Kalman cov update: use Joseph form for stability
+        jo = -W @ H
+        jo[np.diag_indices(jo.shape[0])] += 1  # same as adding Identity mat
+        Pupd = jo@P@jo.T+W@R_gnss@W.T# Done, Kalman update. This is the main workload on VP after speedups
+    
+
+        return etaupd, Pupd
     @classmethod
     def NEESes(cls, x: np.ndarray, P: np.ndarray, x_gt: np.ndarray,) -> np.ndarray:
         """Calculates the total NEES and the NEES for the substates
