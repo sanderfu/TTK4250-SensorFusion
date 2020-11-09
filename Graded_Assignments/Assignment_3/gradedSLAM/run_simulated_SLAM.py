@@ -62,12 +62,23 @@ except Exception as e:
             "grid.linestyle": ":",
             "grid.color": "k",
             "grid.alpha": 0.5,
-            "grid.linewidth": 0.5,
+            "grid.linewidth": 1,
             # Legend
             "legend.frameon": True,
             "legend.framealpha": 1.0,
             "legend.fancybox": True,
             "legend.numpoints": 1,
+            "legend.loc" : "upper right",
+            'legend.fontsize': 10,
+            # Font
+            "font.size" : 15,
+            #Subplots and figure
+            "figure.figsize" : [8,7],
+            "figure.subplot.wspace" : 0.37,
+            "figure.subplot.hspace" : 0.41,
+            "figure.subplot.top" : 0.9,
+            "figure.subplot.right" : 0.95,
+            "figure.subplot.left" : 0.1,
         }
     )
 
@@ -151,7 +162,7 @@ if doAssoPlot:
     figAsso, axAsso = plt.subplots(num=1, clear=True)
 
 # %% Run simulation
-N = 2000
+N = 1000
 
 print("starting sim (" + str(N) + " iterations)")
 
