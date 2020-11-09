@@ -22,6 +22,17 @@ from plotting import ellipse
 from vp_utils import detectTrees, odometry, Car
 from utils import rotmat2d
 
+
+#Imports for multithreading and logging results
+import logging
+import threading
+from zipfile import ZipFile
+import datetime
+import re
+import os
+
+save_results=True
+
 # %% plot config check and style setup
 
 
@@ -55,8 +66,6 @@ try:
     plt.style.use(plt_styles)
     print(f"pyplot using style set {plt_styles}")
 except Exception as e:
-    print(e)
-    print("setting grid and only grid and legend manually")
     plt.rcParams.update(
         {
             # setgrid
@@ -64,12 +73,23 @@ except Exception as e:
             "grid.linestyle": ":",
             "grid.color": "k",
             "grid.alpha": 0.5,
-            "grid.linewidth": 0.5,
+            "grid.linewidth": 1,
             # Legend
             "legend.frameon": True,
             "legend.framealpha": 1.0,
             "legend.fancybox": True,
             "legend.numpoints": 1,
+            "legend.loc" : "upper right",
+            'legend.fontsize': 10,
+            # Font
+            "font.size" : 15,
+            #Subplots and figure
+            "figure.figsize" : [8,7],
+            "figure.subplot.wspace" : 0.37,
+            "figure.subplot.hspace" : 0.34,
+            "figure.subplot.top" : 0.95,
+            "figure.subplot.right" : 0.95,
+            "figure.subplot.left" : 0.18,
         }
     )
 
@@ -106,7 +126,7 @@ b = 0.5  # laser distance to the left of center
 
 car = Car(L, H, a, b)
 
-sigmas = [0.012,0.009,(0.351*np.pi/180)]
+sigmas = [0.01,0.008,(0.08*np.pi/180)]
 CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
 Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
 
@@ -146,7 +166,7 @@ CInorm_ranges_bearings = np.zeros((mK, 2))
 
 # Initialize state
 eta = np.array([Lo_m[0], La_m[1], 36 * np.pi / 180]) # you might want to tweak these for a good reference
-P = 0.1*np.eye(3)
+P = 0*np.eye(3)
 P_cached = np.copy(P)
 
 mk_first = 1  # first seems to be a bit off in timing
@@ -283,13 +303,13 @@ ax7[0].plot(NISnorm[:mk], lw=0.5)
 
 ax7[0].legend(['CI lower', 'CI upper', 'NIS'])
 
-ax7[0].set_title(f'NIS, {insideCI.mean()*100}% inside {confprob*100}% CI\n')
+ax7[0].set_title(f'NIS, {np.round(insideCI.mean()*100,2)}% inside {confprob*100}% CI\n')
 ax7[1].plot(CInorm_ranges_bearings[:mk,0], '--', color='blue')
 ax7[1].plot(CInorm_ranges_bearings[:mk,1], '--', color='blue')
 ax7[1].plot(NISnorm_ranges[:mk], lw=0.5, color='purple')
 ax7[1].plot(NISnorm_bearings[:mk], lw=0.5, color='red')
 ax7[1].legend(['CI lower', 'CI upper','NIS ranges', 'NIS bearings'])
-ax7[1].set_title(f'NIS_ranges, {insideCI_ranges.mean()*100}% inside {confprob*100}% CI\nNIS_bearings, {insideCI_bearings.mean()*100}% inside {confprob*100}% CI')
+ax7[1].set_title(f'NIS_ranges, {np.round(insideCI_ranges.mean()*100,2)}% inside {confprob*100}% CI\nNIS_bearings, {np.round(insideCI_bearings.mean()*100,2)}% inside {confprob*100}% CI')
 
 # %% slam
 
@@ -315,9 +335,24 @@ ax6.plot(*xupd[mk_first:mk, :2].T)
 ax6.set(
     title=f"Steps {k}, laser scans {mk-1}, landmarks {len(eta[3:])//2},\nmeasurements {z.shape[0]}, num new = {np.sum(a[mk] == -1)}"
 )
-plt.show()
 
-# %%
+
+# %% Save plots
+the_time = str(datetime.datetime.now())
+the_time = re.sub(r':',r';', the_time)
+the_time = re.sub(r' ',r'_', the_time)
+print(the_time)
+
+if save_results:
+    zipObj = ZipFile(f"test_real{the_time}.zip", 'w')
+    for i in plt.get_fignums():
+        filename = f"fig_real{i}{the_time}.pdf"
+        plt.figure(i)
+        plt.savefig(filename)
+        zipObj.write(filename)
+        os.remove(filename)
+    zipObj.close()
+
 
 
 plt.show()
