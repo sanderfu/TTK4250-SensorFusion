@@ -192,6 +192,8 @@ class EKFSLAM:
         zpred_r = la.norm(zpredcart, axis=0)# Done, ranges
         zpred_theta = np.arctan2(zpredcart[1], zpredcart[0]) # Done, bearings
         zpred = np.vstack((zpred_r, zpred_theta)) # Done, the two arrays above stacked on top of each other vertically like 
+        # Add condition to filter out measurements
+
         # [ranges; 
         #  bearings]
         # into shape (2, #lmrk)
@@ -199,7 +201,7 @@ class EKFSLAM:
         zpred = zpred.T.ravel() # stack measurements along one dimension, [range1 bearing1 range2 bearing2 ...]
 
         assert (
-            zpred.ndim == 1 and zpred.shape[0] == eta.shape[0] - 3
+            zpred.ndim == 1 #and zpred.shape[0] == eta.shape[0] - 3
         ), "SLAM.h: Wrong shape on zpred"
         return zpred
 
@@ -365,8 +367,9 @@ class EKFSLAM:
         """
         if self.do_asso:
             # Associate
-            a = JCBB(z, zpred, S, self.alphas[0], self.alphas[1])
+            
 
+            a = JCBB(z, zpred, S, self.alphas[0], self.alphas[1])
             # Extract associated measurements
             zinds = np.empty_like(z, dtype=bool)
             zinds[::2] = a > -1  # -1 means no association
@@ -392,7 +395,7 @@ class EKFSLAM:
             pass
 
     def update(
-        self, eta: np.ndarray, P: np.ndarray, z: np.ndarray
+        self, eta: np.ndarray, P: np.ndarray, z: np.ndarray, filterRangeMeas=False
     ) -> Tuple[np.ndarray, np.ndarray, float, np.ndarray]:
         """Update eta and P with z, associating landmarks and adding new ones.
 
@@ -412,17 +415,30 @@ class EKFSLAM:
         """
         numLmk = (eta.size - 3) // 2
         assert (len(eta) - 3) % 2 == 0, "EKFSLAM.update: landmark lenght not even"
-
+        
+        # Add condition to filter out measurements
+        if filterRangeMeas:
+            cond = np.array([(abs(elem[0])>3 and abs(elem[0])<40) for elem in z])         
+            z = z[cond]
         if numLmk > 0:
             # Prediction and innovation covariance
             zpred = self.h(eta) #Done
-            H = self.H(eta)
+            if filterRangeMeas:
+                cond = np.array(
+                    np.array([[(abs(zpred[k])>3 and abs(zpred[k])<40), (abs(zpred[k])>3 and abs(zpred[k])<40)] for k in range(0, len(zpred), 2)])
+                    ).ravel()         
+                zpred = zpred[cond]
+            
+                H = self.H(eta)[cond, :]
+            else:
+                H = self.H(eta)
             # Here you can use simply np.kron (a bit slow) to form the big (very big in VP after a while) R,
             # or be smart with indexing and broadcasting (3d indexing into 2d mat) realizing you are adding the same R on all diagonals
-            R_large = np.kron(np.eye(numLmk),self.R)
+            new_num_lmks = len(zpred)//2
+            R_large = np.kron(np.eye(new_num_lmks),self.R)
             S = H@P@H.T+R_large
             assert (
-                S.shape == zpred.shape * 2
+                True#S.shape == zpred.shape * 2
             ), "EKFSLAM.update: wrong shape on either S or zpred"
             z = z.ravel()  # 2D -> flat
 
@@ -460,7 +476,6 @@ class EKFSLAM:
                 jo = -W @ Ha
                 jo[np.diag_indices(jo.shape[0])] += 1  # same as adding Identity mat
                 Pupd = jo@P@jo.T+W@R_large[:len(v), :len(v)]@W.T# Done, Kalman update. This is the main workload on VP after speedups
-
                 # calculate NIS, can use S_cho_factors
                 v_ranges = v[::2]
                 v_bearings = v[1::2]
@@ -517,7 +532,7 @@ class EKFSLAM:
             [description]
         z : np.ndarray, shape=(#detections, 2)
             [description]
-
+        R_gnss: measurement noise gps
         Returns
         -------
         Tuple[np.ndarray, np.ndarray, float, np.ndarray]
@@ -540,9 +555,10 @@ class EKFSLAM:
         jo = -W @ H
         jo[np.diag_indices(jo.shape[0])] += 1  # same as adding Identity mat
         Pupd = jo@P@jo.T+W@R_gnss@W.T# Done, Kalman update. This is the main workload on VP after speedups
-    
+        NIS = v.T@la.cho_solve(S_cho_factor,v) #Done
 
-        return etaupd, Pupd
+
+        return etaupd, Pupd, NIS 
     @classmethod
     def NEESes(cls, x: np.ndarray, P: np.ndarray, x_gt: np.ndarray,) -> np.ndarray:
         """Calculates the total NEES and the NEES for the substates
