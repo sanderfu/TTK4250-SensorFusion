@@ -86,10 +86,10 @@ except Exception as e:
             #Subplots and figure
             "figure.figsize" : [8,7],
             "figure.subplot.wspace" : 0.37,
-            "figure.subplot.hspace" : 0.34,
-            "figure.subplot.top" : 0.95,
+            "figure.subplot.hspace" : 0.41,
+            "figure.subplot.top" : 0.9,
             "figure.subplot.right" : 0.95,
-            "figure.subplot.left" : 0.18,
+            "figure.subplot.left" : 0.1,
         }
     )
 
@@ -175,7 +175,7 @@ t = timeOdo[0]
 
 # %%  run
 print(K)
-N = 2500#K
+N = 15000#K
 
 doPlot = False
 
