@@ -86,7 +86,7 @@ except Exception as e:
             #Subplots and figure
             "figure.figsize" : [8,7],
             "figure.subplot.wspace" : 0.37,
-            "figure.subplot.hspace" : 0.41,
+            "figure.subplot.hspace" : 0.76,
             "figure.subplot.top" : 0.9,
             "figure.subplot.right" : 0.95,
             "figure.subplot.left" : 0.1,
@@ -126,13 +126,13 @@ b = 0.5  # laser distance to the left of center
 
 car = Car(L, H, a, b)
 
-sigmas = [1,0.8,(0.16*np.pi/180)]
+sigmas = [1,0.8,(0.8*np.pi/180)]
 CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
 Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
 
 # %% Initilize
 #Q = np.diag([0.1**2,0.1**2,(np.pi/180)**2]) #INITDONE
-R = np.diag([0.05**2, (0.2*np.pi/180)**2]) #INITDONE
+R = np.diag([0.8**2, (0.8*np.pi/180)**2]) #INITDONE
 
 
 JCBBalphas = np.array(
@@ -179,7 +179,7 @@ t = timeOdo[0]
 
 # %%  run
 print(K)
-N = 5000#K
+N = K#K
 
 
 doPlot = False
@@ -288,7 +288,6 @@ for k in tqdm(range(N)):
             NISnorm_gnss[k_gnss] = NIS_gnss[k_gnss]/2
 
             CInorm_gnss[k_gnss] = np.array(chi2.interval(confidence_prob, 2)) / 2 
-            k_gnss +=1
     if k < K - 1:
         dt = timeOdo[k + 1] - t
         t = timeOdo[k + 1]
@@ -313,11 +312,14 @@ ax3.plot(CInorm[:mk, 0], "--")
 ax3.plot(CInorm[:mk, 1], "--")
 ax3.plot(NISnorm[:mk], lw=0.5)
 
-ax3.set_title(f"NIS Laser Measurements, {insideCI.mean()*100:.2f}% inside CI")
+ax3.set_title(f"NIS Laser Measurements, {np.round(insideCI.mean()*100,2):.2f}% inside CI")
 insideCI_ranges = (CInorm_ranges_bearings[:mk,0] <= NISnorm_ranges[:mk]) * (NISnorm_ranges[:mk] <= CInorm_ranges_bearings[:mk,1])
 insideCI_bearings = (CInorm_ranges_bearings[:mk,0] <= NISnorm_bearings[:mk]) * (NISnorm_bearings[:mk] <= CInorm_ranges_bearings[:mk,1])
 
-fig7, ax7 = plt.subplots(nrows=3, ncols=1,num=7, clear=True)
+nis_rows=2
+if do_gnss_update:
+    nis_rows=3
+fig7, ax7 = plt.subplots(nrows=nis_rows, ncols=1,num=7, clear=True)
 
 ax7[0].plot(CInorm[:mk,0], '--')
 ax7[0].plot(CInorm[:mk,1], '--')
@@ -334,12 +336,12 @@ ax7[1].set_title(f'NIS_ranges, {np.round(insideCI_ranges.mean()*100,2)}% inside 
 
 
 insideCI_gnss = (CInorm_gnss[:k_gnss, 0] <= NISnorm_gnss[:k_gnss]) * (NISnorm_gnss[:k_gnss] <= CInorm_gnss[:k_gnss, 1])
-
-ax7[2].plot(CInorm_gnss[:k_gnss,0], '--')
-ax7[2].plot(CInorm_gnss[:k_gnss,1], '--')
-ax7[2].plot(NISnorm_gnss[:k_gnss], lw=0.5)
-ax7[2].legend(['CI lower', 'CI upper', 'NIS_gnss'])
-ax7[2].set_title(f'NIS_gnss, {np.round(insideCI_gnss.mean()*100,2)}% inside {confprob*100}% CI\n')
+if do_gnss_update:
+    ax7[2].plot(CInorm_gnss[:k_gnss,0], '--')
+    ax7[2].plot(CInorm_gnss[:k_gnss,1], '--')
+    ax7[2].plot(NISnorm_gnss[:k_gnss], lw=0.5)
+    ax7[2].legend(['CI lower', 'CI upper', 'NIS_gnss'])
+    ax7[2].set_title(f'NIS_gnss, {np.round(insideCI_gnss.mean()*100,2)}% inside {confprob*100}% CI\n')
 # %% slam
 
 if do_raw_prediction:
@@ -351,10 +353,10 @@ if do_raw_prediction:
         marker=".",
         label="GPS",
     )
-    ax5.plot(*odox[:N, :2].T, label="odom")
-    ax5.plot(*xupd[mk_first:mk, :2].T, label="SLAM position")
+    ax5.plot(*odox[:N, :2].T, label="Odometry")
+    ax5.plot(*xupd[mk_first:mk, :2].T, label="SLAM")
     ax5.grid()
-    ax5.set_title(f"GPS vs odometry integration, vs pose estimated. \nTotal RMSE for pose: {RMSE}")
+    ax5.set_title(f"Comparison of position. \nTotal RMSE for pose: {np.round(RMSE,2)}")
     ax5.legend()
 
 # %%
