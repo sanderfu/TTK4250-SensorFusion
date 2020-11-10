@@ -5,7 +5,7 @@ import scipy.linalg as la
 from utils import rotmat2d
 from JCBB import JCBB
 import utils
-
+from scipy import sparse
 # import line_profiler
 # import atexit
 
@@ -417,8 +417,8 @@ class EKFSLAM:
         assert (len(eta) - 3) % 2 == 0, "EKFSLAM.update: landmark lenght not even"
         
         # As given on website
-        lower=10
-        upper = 20
+        lower=5
+        upper = 30
         filter_range = lambda range_meas: abs(range_meas)>lower and abs(range_meas)<upper
         # Add condition to filter out measurements
         if filterRangeMeas:
@@ -432,17 +432,19 @@ class EKFSLAM:
                 cond = np.array(
                         [np.array([filter_range(zpred[k]), filter_range(zpred[k])]) for k in range(0, len(zpred), 2)]
                     ).ravel()    
-                
-                zpred = zpred[cond]
+                if len(zpred)>0:
+                    zpred = zpred[cond]
             
-                H = self.H(eta)[cond, :]
+                    H = self.H(eta)[cond, :]
             else:
                 H = self.H(eta)
             # Here you can use simply np.kron (a bit slow) to form the big (very big in VP after a while) R,
             # or be smart with indexing and broadcasting (3d indexing into 2d mat) realizing you are adding the same R on all diagonals
             new_num_lmks = len(zpred)//2
-            I_lmks = np.eye(new_num_lmks)
-            R_large = np.kron(I_lmks,self.R)
+            I_lmks = sparse.eye(new_num_lmks)
+            R = sparse.csr_matrix(self.R)
+            
+            R_large = sparse.kron(I_lmks,R)
             S = H@P@H.T+R_large
             assert (
                 True#S.shape == zpred.shape * 2
@@ -482,7 +484,7 @@ class EKFSLAM:
                 # Kalman cov update: use Joseph form for stability
                 jo = -W @ Ha
                 jo[np.diag_indices(jo.shape[0])] += 1  # same as adding Identity mat
-                Pupd = jo@P@jo.T+W@R_large[:len(v), :len(v)]@W.T# Done, Kalman update. This is the main workload on VP after speedups
+                Pupd = jo@P@jo.T+W@R_large.toarray()[:len(v), :len(v)]@W.T# Done, Kalman update. This is the main workload on VP after speedups
                 # calculate NIS, can use S_cho_factors
                 v_ranges = v[::2]
                 v_bearings = v[1::2]
