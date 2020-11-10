@@ -417,9 +417,9 @@ class EKFSLAM:
         assert (len(eta) - 3) % 2 == 0, "EKFSLAM.update: landmark lenght not even"
         
         # As given on website
-        lower=3
-        upper = 40
-        filter_range = lambda range_meas: abs(range_meas)>lower and abs(elem[0])<upper
+        lower=10
+        upper = 20
+        filter_range = lambda range_meas: abs(range_meas)>lower and abs(range_meas)<upper
         # Add condition to filter out measurements
         if filterRangeMeas:
             cond = np.array([filter_range(elem[0]) for elem in z])  
@@ -441,7 +441,8 @@ class EKFSLAM:
             # Here you can use simply np.kron (a bit slow) to form the big (very big in VP after a while) R,
             # or be smart with indexing and broadcasting (3d indexing into 2d mat) realizing you are adding the same R on all diagonals
             new_num_lmks = len(zpred)//2
-            R_large = np.kron(np.eye(new_num_lmks),self.R)
+            I_lmks = np.eye(new_num_lmks)
+            R_large = np.kron(I_lmks,self.R)
             S = H@P@H.T+R_large
             assert (
                 True#S.shape == zpred.shape * 2
