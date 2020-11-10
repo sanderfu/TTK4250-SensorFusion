@@ -139,6 +139,16 @@ R = np.diag([0.06**2, (0.12*np.pi/180)**2]) #INITDONE
 JCBBalphas = np.array(
     [1e-7, 1e-7]  # INITDONE
 )
+
+
+
+
+
+
+
+
+
+
 sensorOffset = np.array([car.a + car.L, car.b])
 doAsso = True
 
@@ -292,7 +302,7 @@ for k in tqdm(range(N)):
             NISnorm_gnss[k_gnss] = NIS_gnss[k_gnss]/2
 
             CInorm_gnss[k_gnss] = np.array(chi2.interval(confidence_prob, 2)) / 2 
-            k_gnss +=1        
+        k_gnss +=1        
     if k < K - 1:
         dt = timeOdo[k + 1] - t
         t = timeOdo[k + 1]
