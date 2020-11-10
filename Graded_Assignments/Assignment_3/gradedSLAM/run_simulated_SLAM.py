@@ -120,19 +120,24 @@ M = len(landmarks)
 Q = np.diag([0.05**2,0.009*2,(0.4*np.pi/180)**2]) #INITDONE
 R = np.diag([0.07**2, (1*np.pi/180)**2]) #INITDONE
 
-
-
-
 doAsso = True
 
-JCBBalphas = np.array([0.0001, 0.0001])  #INITDONE first is for joint compatibility, second is individual
-# these can have a large effect on runtime either through the number of landmarks created
-# or by the size of the association search space.
 
-# new landmarks = low
+'''
+Explanation of JCBBalphas:
+    Both alphas are used for gating in JCBB. Smaller alpha = larger gate generally.
+    JCBBalpha[0]: For gating joint compatability.
+    JCBBalpha[1]: For gating individual compatability
+    
+    Remark: Affects runtime significantly and slam accuracy also to some extent.
+    Based on experience from this assignment, alphas must be low (large gates) 
+    especially when the measurement noise is set low
+'''
+JCBBalphas = np.array([0.0001, 0.0001])
+
 slam = EKFSLAM(Q, R, do_asso=doAsso, alphas=JCBBalphas)
 
-# allocate
+# Allocate matrices and vectors
 eta_pred: List[Optional[np.ndarray]] = [None] * K
 P_pred: List[Optional[np.ndarray]] = [None] * K
 eta_hat: List[Optional[np.ndarray]] = [None] * K
@@ -147,25 +152,20 @@ NISnorm_bearings = np.zeros(K)
 
 CI = np.zeros((K, 2))
 CI_ranges_bearings = np.zeros((K, 2))
-
 CInorm = np.zeros((K, 2))
 CInorm_ranges_bearings = np.zeros((K, 2))
-
-
-
 NEESes = np.zeros((K, 3))
-
-#Testing with calculating NEES for eta and map
-NEESeta = np.zeros((K,1))
-NEESmap = np.zeros((K,1))
 
 # For consistency testing
 alpha = 0.05
 confprob = 1 - alpha
 
-# init
-eta_pred[0] = poseGT[0]  # we start at the correct position for reference
-P_pred[0] = 1e-4 * np.eye(3)  # we also say that we are 100% sure about that
+# Initial values
+#Comment: We start at the correct position for reference
+eta_pred[0] = poseGT[0]
+
+#Comment: We say that we are very certain about this start position
+P_pred[0] = 1e-4 * np.eye(3)
 
 # %% Set up plotting
 # plotting
@@ -178,7 +178,7 @@ if doAssoPlot:
 # %% Run simulation
 N = 1000
 
-print("starting sim (" + str(N) + " iterations)")
+print("starting simulation (" + str(N) + " iterations)")
 
 for k, z_k in tqdm(enumerate(z[:N])):
 
@@ -226,7 +226,7 @@ for k, z_k in tqdm(enumerate(z[:N])):
         plt.pause(0.001)
 
 
-print("sim complete")
+print("Simulation complete")
 
 pose_est = np.array([x[:3] for x in eta_hat[:N]])
 lmk_est = [eta_hat_k[3:].reshape(-1, 2) for eta_hat_k in eta_hat[:N]]
@@ -266,8 +266,7 @@ plt.ylabel("[m]")
 ax2.legend()
 
 # %% Consistency
-print("Consistency results:")
-
+print("\n----------\nConsistency results\n----------\n")
 
 # NIS
 insideCI = (CInorm[:N,0] <= NISnorm[:N]) * (NISnorm[:N] <= CInorm[:N,1])
@@ -303,11 +302,7 @@ CI_ANIS = np.array(chi2.interval(confprob,N))/N
 print(f"ANIS: {ANIS}")
 print(f"CI ANIS: {CI_ANIS}")
 
-
-
-
 # NEES
-
 fig4, ax4 = plt.subplots(nrows=3, ncols=1, figsize=(7, 5), num=4, clear=True, sharex=True)
 tags = ['pose', 'position', 'heading']
 dfs = [3, 2, 1]
@@ -324,18 +319,13 @@ for ax, tag, NEES, df in zip(ax4, tags, NEESes.T, dfs):
     print(f"CI ANEES {tag}: {CI_ANEES}")
     print(f"ANEES {tag}: {NEES.mean()}")
 
-fig4.tight_layout()
-
 # %% RMSE
 
 ylabels = ['m', 'deg']
 scalings = np.array([1, 180/np.pi])
-
 fig5, ax5 = plt.subplots(nrows=2, ncols=1, figsize=(7, 5), num=5, clear=True, sharex=True)
-
 pos_err = np.linalg.norm(pose_est[:N,:2] - poseGT[:N,:2], axis=1)
 heading_err = np.abs(wrapToPi(pose_est[:N,2] - poseGT[:N,2]))
-
 errs = np.vstack((pos_err, heading_err))
 
 for ax, err, tag, ylabel, scaling in zip(ax5, errs, tags[1:], ylabels, scalings):
@@ -343,8 +333,6 @@ for ax, err, tag, ylabel, scaling in zip(ax5, errs, tags[1:], ylabels, scalings)
     ax.set_title(f"{tag}: RMSE {np.round(np.sqrt((err**2).mean())*scaling,2)} {ylabel}")
     ax.set_ylabel(f"[{ylabel}]")
     ax.grid()
-
-fig5.tight_layout()
 
 # %% Movie time
 
