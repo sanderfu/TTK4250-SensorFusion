@@ -442,8 +442,8 @@ class EKFSLAM:
             Only used if filterRangeMeas flag is set, which is only the case 
             in run_real_SLAM.py
         '''
-        lower=5
-        upper = 30
+        lower=3
+        upper = 20
         filter_range = lambda range_meas: abs(range_meas)>lower and abs(range_meas)<upper
         # Add condition to filter out measurements if flag set
         if filterRangeMeas:
@@ -472,7 +472,7 @@ class EKFSLAM:
             R_large = sparse.kron(I_lmks,R)
             S = H@P@H.T+R_large
             assert (
-                True#S.shape == zpred.shape * 2
+                S.shape == zpred.shape * 2
             ), "EKFSLAM.update: wrong shape on either S or zpred"
             z = z.ravel()  # 2D -> flat
 
