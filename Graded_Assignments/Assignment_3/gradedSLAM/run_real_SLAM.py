@@ -126,17 +126,13 @@ b = 0.5  # laser distance to the left of center
 
 car = Car(L, H, a, b)
 
-sigmas = [1,0.8,(0.8*np.pi/180)]
+sigmas = [0.1,0.05,(1.5*np.pi/180)]
 CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
 Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
-
-# %% Initilize
-#Q = np.diag([0.1**2,0.1**2,(np.pi/180)**2]) #INITDONE
-R = np.diag([0.8**2, (0.8*np.pi/180)**2]) #INITDONE
-
+R = np.diag([0.08**2, (0.2*np.pi/180)**2]) #INITDONE
 
 JCBBalphas = np.array(
-   [1e-7, 1e-7] # INITDONE
+   [1e-6, 1e-6] # INITDONE
 )
 sensorOffset = np.array([car.a + car.L, car.b])
 doAsso = True
@@ -146,7 +142,6 @@ slam = EKFSLAM(Q, R, do_asso=doAsso, alphas=JCBBalphas, sensor_offset=sensorOffs
 # For consistency testing
 alpha = 0.05
 confidence_prob = 1 - alpha
-
 
 xupd = np.zeros((mK, 3))
 a = [None] * mK
@@ -171,19 +166,15 @@ CInorm_gnss = np.zeros((Kgps, 2))
 # Initialize state
 eta = np.array([Lo_m[0], La_m[1], 36 * np.pi / 180]) # you might want to tweak these for a good reference
 P = 1e-5*np.eye(3)
-P_cached = np.copy(P)
 
 mk_first = 1  # first seems to be a bit off in timing
 mk = mk_first
 t = timeOdo[0]
 
-# %%  run
-print(K)
-N = K#K
-
+# %%  Run
+N = 250#K
 
 doPlot = False
-
 lh_pose = None
 
 if doPlot:
@@ -193,10 +184,8 @@ if doPlot:
     sh_lmk = ax.scatter(np.nan, np.nan, c="r", marker="x")
     sh_Z = ax.scatter(np.nan, np.nan, c="b", marker=".")
 
-
-#Warning: slam.predict modifies the P function it takes in, and without using np.copy this is a shallow copy meaning we modify the original!
 do_raw_prediction = True
-if do_raw_prediction:  # TODO: further processing such as plotting
+if do_raw_prediction:
     odos = np.zeros((K, 3))
     odox = np.zeros((K, 3))
     odox[0] = eta
@@ -205,35 +194,26 @@ if do_raw_prediction:  # TODO: further processing such as plotting
         odos[k + 1] = odometry(speed[k + 1], steering[k + 1], 0.025, car)
         odox[k + 1], _ = slam.predict(odox[k], np.copy(P), odos[k + 1])
 
-assert np.allclose(P,P_cached), "P has been modified in function!!"
 squared_error = 0
 do_gnss_update = False
 k_gnss = 0
 R_gnss = np.diag([0.2**2,0.2**2])
 for k in tqdm(range(N)):
     
-
     if mk < mK - 1 and timeLsr[mk] <= timeOdo[k + 1]:
-        # Force P to symmetric: there are issues with long runs (>10000 steps)
-        # seem like the prediction might be introducing some minor asymetries,
-        # so best to force P symetric before update (where chol etc. is used).
-        # TODO: remove this for short debug runs in order to see if there are small errors
-        #P = (P + P.T) / 2
         dt = timeLsr[mk] - t
-        if dt < 0:  # avoid assertions as they can be optimized avay?
-            raise ValueError("negative time increment")
+        if dt < 0:
+            raise ValueError("Negative time increment")
 
-        t = timeLsr[mk]  # ? reset time to this laser time for next post predict
+        t = timeLsr[mk]  #reset time to this laser time for next post predict
         odo = odometry(speed[k + 1], steering[k + 1], dt, car)
-        
-        #Comment: Do not think the line below should be here.
-        #eta, P = slam.predict(eta,P,odo) # Done predict
 
         z = detectTrees(LASER[mk])
-        eta, P, NIS[mk], NIS_ranges[mk], NIS_bearings[mk], a[mk] =  slam.update(eta,P,z) # TODO update
+        #Done update:
+        eta, P, NIS[mk], NIS_ranges[mk], NIS_bearings[mk], a[mk] =  slam.update(eta,P,z)
 
         num_asso = np.count_nonzero(a[mk] > -1)
-
+        #Calculate NISes
         if num_asso > 0:
             NISnorm[mk] = NIS[mk] / (2 * num_asso)
             NISnorm_ranges[mk] = NIS_ranges[mk] /num_asso
@@ -249,11 +229,8 @@ for k in tqdm(range(N)):
             NISnorm[mk] = 1
             NISnorm_ranges[mk] = 1
             NISnorm_bearings[mk] = 1
-            
             CInorm[mk].fill(1)
-
             CInorm_ranges_bearings[mk].fill(1)
-
         xupd[mk] = eta[:3]
 
         if doPlot:
@@ -284,10 +261,11 @@ for k in tqdm(range(N)):
         squared_error += la.norm(eta[:2]-z_gnss, 2)**2
         k_gnss+=1
         if do_gnss_update:
-            eta, P, NIS_gnss[k_gnss] =  slam.updateGNSS(eta, P, z_gnss, R_gnss) # Done update
+            #Done update GNSS
+            eta, P, NIS_gnss[k_gnss] =  slam.updateGNSS(eta, P, z_gnss, R_gnss)
             NISnorm_gnss[k_gnss] = NIS_gnss[k_gnss]/2
-
             CInorm_gnss[k_gnss] = np.array(chi2.interval(confidence_prob, 2)) / 2 
+            
     if k < K - 1:
         dt = timeOdo[k + 1] - t
         t = timeOdo[k + 1]
@@ -296,7 +274,6 @@ for k in tqdm(range(N)):
 
 
 #RMSE for pose, where GT is GPS measurements
-
 RMSE = np.sqrt(squared_error/k_gnss)
 
 # %% Consistency
@@ -382,6 +359,17 @@ if save_results:
         plt.savefig(filename)
         zipObj.write(filename)
         os.remove(filename)
+    #Save plotted data as csv also
+    np.savetxt("slam_position.csv",xupd[mk_first:mk, :2].T,delimiter=",")
+    zipObj.write("slam_position.csv")
+    os.remove("slam_position.csv")
+    
+    #Save ANISes
+    with open("ANIS.txt","w") as file:
+        file.write(f"\nANIS: {ANIS}\n")
+        file.write(f"CI ANIS: {CI_ANIS}\n")
+    zipObj.write("ANIS.txt")
+    os.remove("ANIS.txt")
     zipObj.close()
 
 
