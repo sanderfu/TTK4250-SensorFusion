@@ -126,13 +126,13 @@ b = 0.5  # laser distance to the left of center
 
 car = Car(L, H, a, b)
 
-sigmas = [1,0.8,(0.16*np.pi/180)]
+sigmas = [1,0.8,(0.8*np.pi/180)]
 CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
 Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
 
 # %% Initilize
 #Q = np.diag([0.1**2,0.1**2,(np.pi/180)**2]) #INITDONE
-R = np.diag([0.05**2, (0.2*np.pi/180)**2]) #INITDONE
+R = np.diag([0.8**2, (0.8*np.pi/180)**2]) #INITDONE
 
 
 JCBBalphas = np.array(
