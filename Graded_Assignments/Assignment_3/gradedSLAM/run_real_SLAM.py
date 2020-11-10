@@ -172,7 +172,7 @@ mk = mk_first
 t = timeOdo[0]
 
 # %%  Run
-N = 2500#K
+N = 250#K
 
 doPlot = False
 lh_pose = None
@@ -359,6 +359,17 @@ if save_results:
         plt.savefig(filename)
         zipObj.write(filename)
         os.remove(filename)
+    #Save plotted data as csv also
+    np.savetxt("slam_position.csv",xupd[mk_first:mk, :2].T,delimiter=",")
+    zipObj.write("slam_position.csv")
+    os.remove("slam_position.csv")
+    
+    #Save ANISes
+    with open("ANIS.txt","w") as file:
+        file.write(f"\nANIS: {ANIS}\n")
+        file.write(f"CI ANIS: {CI_ANIS}\n")
+    zipObj.write("ANIS.txt")
+    os.remove("ANIS.txt")
     zipObj.close()
 
 
