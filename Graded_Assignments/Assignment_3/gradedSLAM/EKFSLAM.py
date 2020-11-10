@@ -416,17 +416,23 @@ class EKFSLAM:
         numLmk = (eta.size - 3) // 2
         assert (len(eta) - 3) % 2 == 0, "EKFSLAM.update: landmark lenght not even"
         
+        # As given on website
+        lower=3
+        upper = 40
+        filter_range = lambda range_meas: abs(range_meas)>lower and abs(elem[0])<upper
         # Add condition to filter out measurements
         if filterRangeMeas:
-            cond = np.array([(abs(elem[0])>3 and abs(elem[0])<40) for elem in z])         
-            z = z[cond]
-        if numLmk > 0:
+            cond = np.array([filter_range(elem[0]) for elem in z])  
+            if len(cond)>0:
+                z = z[cond]
+        if numLmk > 0 and len(z)>0:
             # Prediction and innovation covariance
             zpred = self.h(eta) #Done
             if filterRangeMeas:
                 cond = np.array(
-                    np.array([[(abs(zpred[k])>3 and abs(zpred[k])<40), (abs(zpred[k])>3 and abs(zpred[k])<40)] for k in range(0, len(zpred), 2)])
-                    ).ravel()         
+                        [np.array([filter_range(zpred[k]), filter_range(zpred[k])]) for k in range(0, len(zpred), 2)]
+                    ).ravel()    
+                
                 zpred = zpred[cond]
             
                 H = self.H(eta)[cond, :]
