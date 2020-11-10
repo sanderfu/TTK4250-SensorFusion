@@ -117,8 +117,8 @@ K = len(z)
 M = len(landmarks)
 
 # %% Initilize
-Q = np.diag([0.012**2,0.009*2,(0.351*np.pi/180)**2]) #INITDONE
-R = np.diag([0.1**2, (1*np.pi/180)**2]) #INITDONE
+Q = np.diag([0.05**2,0.009*2,(0.4*np.pi/180)**2]) #INITDONE
+R = np.diag([0.07**2, (1*np.pi/180)**2]) #INITDONE
 
 
 
@@ -182,10 +182,10 @@ print("starting sim (" + str(N) + " iterations)")
 
 for k, z_k in tqdm(enumerate(z[:N])):
 
-    eta_hat[k], P_hat[k], NIS[k], NIS_ranges[k], NIS_bearings[k], a[k] = slam.update(eta_pred[k],P_pred[k],z_k)
+    eta_hat[k], P_hat[k], NIS[k], NIS_ranges[k], NIS_bearings[k], a[k] = slam.update(eta_pred[k],np.copy(P_pred[k]),z_k)
 
     if k < K - 1:
-        eta_pred[k + 1], P_pred[k + 1] = slam.predict(eta_hat[k],P_hat[k],odometry[k])
+        eta_pred[k + 1], P_pred[k + 1] = slam.predict(eta_hat[k],np.copy(P_hat[k]),odometry[k])
 
     assert (
         eta_hat[k].shape[0] == P_hat[k].shape[0]
