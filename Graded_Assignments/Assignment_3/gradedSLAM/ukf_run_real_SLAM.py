@@ -12,7 +12,7 @@ except ImportError as e:
     def tqdm(*args, **kwargs):
         return args[0]
 
-
+import scipy.linalg as la
 import numpy as np
 from EKFSLAM import EKFSLAM
 import matplotlib
@@ -133,7 +133,7 @@ Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
 
 # %% Initilize
 #Q = np.diag([0.1**2,0.1**2,(np.pi/180)**2]) #INITDONE
-R = np.diag([0.1**2, (0.1*np.pi/180)**2]) #INITDONE
+R = np.diag([0.06**2, (0.12*np.pi/180)**2]) #INITDONE
 
 
 JCBBalphas = np.array(
@@ -161,11 +161,16 @@ CInorm = np.zeros((mK, 2))
 
 NIS_ranges = np.zeros(mK)
 NIS_bearings = np.zeros(mK)
+NIS_gnss = np.zeros(Kgps)
+
 NISnorm_ranges = np.zeros(mK)
 NISnorm_bearings = np.zeros(mK)
+NISnorm_gnss = np.zeros(Kgps)
 
 CI_ranges_bearings = np.zeros((mK, 2))
 CInorm_ranges_bearings = np.zeros((mK, 2))
+CI_gnss = np.zeros((Kgps, 2))
+CInorm_gnss = np.zeros((Kgps, 2))
 
 
 # Initialize state
@@ -205,7 +210,10 @@ if do_raw_prediction:  # TODO: further processing such as plotting
         odox[k + 1], _ = ekfslam.predict(odox[k], np.copy(P), odos[k + 1])
 
 assert np.allclose(P,P_cached), "P has been modified in function!!"
-
+squared_error = 0
+do_gnss_update = True
+k_gnss = 0
+R_gnss = np.diag([0.4**2,0.4**2])
 
 for k in tqdm(range(N)):
     
@@ -226,7 +234,7 @@ for k in tqdm(range(N)):
         #eta, P = slam.predict(eta,P,odo) # Done predict
 
         z = detectTrees(LASER[mk])
-        eta, P, NIS[mk], NIS_ranges[mk], NIS_bearings[mk], a[mk] =  ekfslam.update(eta,P,z) # TODO update
+        eta, P, NIS[mk], NIS_ranges[mk], NIS_bearings[mk], a[mk] =  ekfslam.update(eta,P,z, True) # TODO update
 
         num_asso = np.count_nonzero(a[mk] > -1)
 
@@ -275,7 +283,16 @@ for k in tqdm(range(N)):
             plt.pause(0.00001)
 
         mk += 1
+    if k_gnss < Kgps-1 and timeGps[k_gnss]<=timeOdo[k+1]:
+        z_gnss = np.array([Lo_m[k_gnss], La_m[k_gnss]])
+        squared_error += la.norm(eta[:2]-z_gnss, 2)**2
 
+        if do_gnss_update:
+            eta, P, NIS_gnss[k_gnss] =  slam.updateGNSS(eta, P, z_gnss, R_gnss) # Done update
+            NISnorm_gnss[k_gnss] = NIS_gnss[k_gnss]/2
+
+            CInorm_gnss[k_gnss] = np.array(chi2.interval(confidence_prob, 2)) / 2 
+            k_gnss +=1        
     if k < K - 1:
         dt = timeOdo[k + 1] - t
         t = timeOdo[k + 1]
@@ -285,13 +302,15 @@ for k in tqdm(range(N)):
             np.linalg.eigvals(P) >= 0
         ):
             eta, P = ekfslam.predict(eta,P,odo) # Done predict
-# %% Consistency
+#RMSE for pose, where GT is GPS measurements
+RMSE = np.sqrt(squared_error/k_gnss)
 
+# %% Consistency
 # NIS
 confprob = confidence_prob
 insideCI = (CInorm[:mk, 0] <= NISnorm[:mk]) * (NISnorm[:mk] <= CInorm[:mk, 1])
 ANIS = np.mean(NISnorm[:mk])
-CI_ANIS = np.array(chi2.interval(confidence_prob,2*mk))/mk
+CI_ANIS = np.array(chi2.interval(confidence_prob,mk))/mk
 print(f"\nANIS: {ANIS}")
 print(f"CI ANIS: {CI_ANIS}")
 fig3, ax3 = plt.subplots(num=3, clear=True)
@@ -299,19 +318,18 @@ ax3.plot(CInorm[:mk, 0], "--")
 ax3.plot(CInorm[:mk, 1], "--")
 ax3.plot(NISnorm[:mk], lw=0.5)
 
-ax3.set_title(f"NIS, {insideCI.mean()*100:.2f}% inside CI")
+ax3.set_title(f"NIS Laser Measurements, {insideCI.mean()*100:.2f}% inside CI")
 insideCI_ranges = (CInorm_ranges_bearings[:mk,0] <= NISnorm_ranges[:mk]) * (NISnorm_ranges[:mk] <= CInorm_ranges_bearings[:mk,1])
 insideCI_bearings = (CInorm_ranges_bearings[:mk,0] <= NISnorm_bearings[:mk]) * (NISnorm_bearings[:mk] <= CInorm_ranges_bearings[:mk,1])
 
-fig7, ax7 = plt.subplots(nrows=2, ncols=1,num=7, clear=True)
+fig7, ax7 = plt.subplots(nrows=3, ncols=1,num=7, clear=True)
 
 ax7[0].plot(CInorm[:mk,0], '--')
 ax7[0].plot(CInorm[:mk,1], '--')
 ax7[0].plot(NISnorm[:mk], lw=0.5)
-
-ax7[0].legend(['CI lower', 'CI upper', 'NIS'])
-
+ax7[0].legend(['CI lower', 'CI upper', 'NIS_laserMeasurements'])
 ax7[0].set_title(f'NIS, {np.round(insideCI.mean()*100,2)}% inside {confprob*100}% CI\n')
+
 ax7[1].plot(CInorm_ranges_bearings[:mk,0], '--', color='blue')
 ax7[1].plot(CInorm_ranges_bearings[:mk,1], '--', color='blue')
 ax7[1].plot(NISnorm_ranges[:mk], lw=0.5, color='purple')
@@ -319,6 +337,14 @@ ax7[1].plot(NISnorm_bearings[:mk], lw=0.5, color='red')
 ax7[1].legend(['CI lower', 'CI upper','NIS ranges', 'NIS bearings'])
 ax7[1].set_title(f'NIS_ranges, {np.round(insideCI_ranges.mean()*100,2)}% inside {confprob*100}% CI\nNIS_bearings, {np.round(insideCI_bearings.mean()*100,2)}% inside {confprob*100}% CI')
 
+
+insideCI_gnss = (CInorm_gnss[:k_gnss, 0] <= NISnorm_gnss[:k_gnss]) * (NISnorm_gnss[:k_gnss] <= CInorm_gnss[:k_gnss, 1])
+
+ax7[2].plot(CInorm_gnss[:k_gnss,0], '--')
+ax7[2].plot(CInorm_gnss[:k_gnss,1], '--')
+ax7[2].plot(NISnorm_gnss[:k_gnss], lw=0.5)
+ax7[2].legend(['CI lower', 'CI upper', 'NIS_gnss'])
+ax7[2].set_title(f'NIS_gnss, {np.round(insideCI_gnss.mean()*100,2)}% inside {confprob*100}% CI\n')
 # %% slam
 
 if do_raw_prediction:
