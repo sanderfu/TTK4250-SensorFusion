@@ -137,7 +137,7 @@ R = np.diag([0.06**2, (0.12*np.pi/180)**2]) #INITDONE
 
 
 JCBBalphas = np.array(
-   [0.0001, 0.0001] # INITDONE
+    [1e-7, 1e-7]  # INITDONE
 )
 sensorOffset = np.array([car.a + car.L, car.b])
 doAsso = True
@@ -175,7 +175,7 @@ CInorm_gnss = np.zeros((Kgps, 2))
 
 # Initialize state
 eta = np.array([Lo_m[0], La_m[1], 36 * np.pi / 180]) # you might want to tweak these for a good reference
-P = 0*np.eye(3)
+P = 0.00001*np.eye(3)
 P_cached = np.copy(P)
 
 mk_first = 1  # first seems to be a bit off in timing
@@ -184,7 +184,7 @@ t = timeOdo[0]
 
 # %%  run
 print(K)
-N = 4000#K
+N = 20000#K
 
 doPlot = False
 
@@ -213,7 +213,7 @@ assert np.allclose(P,P_cached), "P has been modified in function!!"
 squared_error = 0
 do_gnss_update = True
 k_gnss = 0
-R_gnss = np.diag([0.4**2,0.4**2])
+R_gnss = np.diag([0.45**2,0.45**2])
 
 for k in tqdm(range(N)):
     
@@ -234,7 +234,7 @@ for k in tqdm(range(N)):
         #eta, P = slam.predict(eta,P,odo) # Done predict
 
         z = detectTrees(LASER[mk])
-        eta, P, NIS[mk], NIS_ranges[mk], NIS_bearings[mk], a[mk] =  ekfslam.update(eta,P,z, True) # TODO update
+        eta, P,  NIS[mk], NIS_ranges[mk], NIS_bearings[mk], a[mk] =  ekfslam.update(eta,P,z, True) # TODO update
 
         num_asso = np.count_nonzero(a[mk] > -1)
 
@@ -298,10 +298,10 @@ for k in tqdm(range(N)):
         t = timeOdo[k + 1]
         odo = odometry(speed[k + 1], steering[k + 1], dt, car)
         eta, P = ukfslam.predict(eta,P,odo) # Done predict
-        if not np.all(
-            np.linalg.eigvals(P) >= 0
-        ):
-            eta, P = ekfslam.predict(eta,P,odo) # Done predict
+        #if not np.all(
+        #   np.linalg.eigvals(P) >= 0
+        #):
+        #    eta, P = ekfslam.predict(eta,P,odo) # Done predict
 #RMSE for pose, where GT is GPS measurements
 RMSE = np.sqrt(squared_error/k_gnss)
 

@@ -47,7 +47,23 @@ class UKFSLAM:
         self.sensor_offset = sensor_offset
         self.alpha = float(0.5)
 
+         
+        self.n_dim = 3
+        self.n_sig = 1 + self.n_dim*2
+        
+        self.beta = float(2)
+        self.k = float(3-self.n_dim)
+        self.lambd = pow(self.alpha, 2)*(self.n_dim+k) - self.n_dim
+        self.covar_weights = np.zeros(self.n_sig)
+        self.mean_weights = np.zeros(self.n_sig)
+        
+        self.covar_weights[0] = (self.lambd / (self.n_dim + self.lambd)) + (1 - pow(self.alpha, 2) + self.beta)
+        self.mean_weights[0] = (self.lambd / (self.n_dim + self.lambd))
 
+        for i in range(1, n_sig):
+            self.covar_weights[i] = 1.0 / (2.0*(self.n_dim + self.lambd))
+            self.mean_weights[i] = 1.0 / (2.0*(self.n_dim + self.lambd))
+            
     def f(self, x: np.ndarray, u: np.ndarray) -> np.ndarray:
         """Add the odometry u to the robot state x.
 
@@ -167,21 +183,7 @@ class UKFSLAM:
             eta.shape * 2 == P.shape
         ), "UKFSLAM.predict: input eta and P shape do not match"
         etapred = np.empty_like(eta)
-        n_dim = 3
-        n_sig = 1 + n_dim*2
-        
-        beta = float(2)
-        k = float(3-n_dim)
-        self.lambd = pow(self.alpha, 2)*(n_dim+k) - n_dim
-        covar_weights = np.zeros(n_sig)
-        mean_weights = np.zeros(n_sig)
-        
-        covar_weights[0] = (self.lambd / (n_dim + self.lambd)) + (1 - pow(self.alpha, 2) + beta)
-        mean_weights[0] = (self.lambd / (n_dim + self.lambd))
-
-        for i in range(1, n_sig):
-            covar_weights[i] = 1.0 / (2.0*(n_dim + self.lambd))
-            mean_weights[i] = 1.0 / (2.0*(n_dim + self.lambd))
+       
 
         x = eta[:3]
 
@@ -190,11 +192,11 @@ class UKFSLAM:
         x_pred = np.zeros(n_dim)
         P_pred = np.zeros((n_dim, n_dim))
         for i in range(n_sig):
-            x_pred += mean_weights[i]*sigmas_out[i]
+            x_pred += self.mean_weights[i]*sigmas_out[i]
 
         for i in range(n_sig):
             diff = sigmas_out[i]-x_pred
-            P_pred += covar_weights[i]*np.outer(diff, diff)
+            P_pred += self.covar_weights[i]*np.outer(diff, diff)
 
         P_pred += self.Q
 
@@ -394,7 +396,7 @@ class UKFSLAM:
             pass
 
     def update(
-        self, eta: np.ndarray, P: np.ndarray, z: np.ndarray
+        self, eta: np.ndarray, P: np.ndarray, z: np.ndarray, filterRangeMeas=False
     ) -> Tuple[np.ndarray, np.ndarray, float, np.ndarray]:
         """Update eta and P with z, associating landmarks and adding new ones.
 
@@ -414,13 +416,34 @@ class UKFSLAM:
         """
         numLmk = (eta.size - 3) // 2
         assert (len(eta) - 3) % 2 == 0, "UKFSLAM.update: landmark lenght not even"
-        if numLmk > 0:
+        filter_range = lambda range_meas: abs(range_meas)>lower and abs(range_meas)<upper
+        # Add condition to filter out measurements
+        if filterRangeMeas:
+            cond = np.array([filter_range(elem[0]) for elem in z])  
+            if len(cond)>0:
+                z = z[cond]
+            
+        if numLmk > 0 and len(z)>0:
+            # Prediction and innovation covariance
+            zpred = self.h(eta) #Done
+            if filterRangeMeas:
+                cond = np.array(
+                        [np.array([filter_range(zpred[k]), filter_range(zpred[k])]) for k in range(0, len(zpred), 2)]
+                    ).ravel()    
+                if len(zpred)>0:
+                    zpred = zpred[cond]
+            
+                    #H = self.H(eta)[cond, :]
             # Prediction and innovation covariance
             
 
             # Perform data associatio
             # No association could be made, so skip update
-
+            new_num_lmks = len(zpred)//2
+            I_lmks = np.eye(new_num_lmks)
+  
+            
+            R_large = np.kron(I_lmks,self.R)
 
 
 
@@ -453,7 +476,6 @@ class UKFSLAM:
                 diff = sigmas_out[i] - z_upd
                 S_upd += covar_weights[i]*np.outer(diff, diff)
                 
-            R_large = np.kron(np.eye(m//2),self.R)
             S_upd += R_large
             
             z = z.ravel()  # 2D -> flat
@@ -491,6 +513,16 @@ class UKFSLAM:
     
                 # calculate NIS, can use S_cho_factors
                 NIS = v.T@la.solve(Sa,v) #Done
+                v_ranges = v[::2]
+                v_bearings = v[1::2]
+
+
+                
+                Sa_cho_factor_ranges = la.cho_factor(Sa[::2, ::2])
+                Sa_cho_factor_bearings = la.cho_factor(Sa[1::2, 1::2])
+                NIS_ranges = v_ranges.T@la.cho_solve(Sa_cho_factor_ranges,v_ranges) 
+                NIS_bearings = v_bearings.T@la.cho_solve(Sa_cho_factor_bearings,v_bearings) 
+
     
                 # When tested, remove for speed
                 assert np.allclose(Pupd, Pupd.T), "UKFSLAM.update: Pupd not symmetric"
@@ -518,7 +550,7 @@ class UKFSLAM:
         assert np.allclose(Pupd, Pupd.T), "UKFSLAM.update: Pupd must be symmetric"
         assert np.all(np.linalg.eigvals(Pupd) >= 0), "UKFSLAM.update: Pupd must be PSD"
 
-        return etaupd, Pupd, NIS, assoc
+        return etaupd, Pupd, NIS, NIS_ranges, NIS_bearings, assoc
 
     @classmethod
     def NEESes(cls, x: np.ndarray, P: np.ndarray, x_gt: np.ndarray,) -> np.ndarray:
