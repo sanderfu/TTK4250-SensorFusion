@@ -10,6 +10,16 @@ from matplotlib import animation
 from scipy.stats import chi2
 from utils import wrapToPi
 
+#Imports for multithreading and logging results
+import logging
+import threading
+from zipfile import ZipFile
+import datetime
+import re
+import os
+
+save_results = True
+
 try:
     from tqdm import tqdm
 except ImportError as e:
@@ -145,6 +155,10 @@ CInorm_ranges_bearings = np.zeros((K, 2))
 
 NEESes = np.zeros((K, 3))
 
+#Testing with calculating NEES for eta and map
+NEESeta = np.zeros((K,1))
+NEESmap = np.zeros((K,1))
+
 # For consistency testing
 alpha = 0.05
 confprob = 1 - alpha
@@ -195,8 +209,6 @@ for k, z_k in tqdm(enumerate(z[:N])):
         CInorm[k].fill(1)
         CInorm_ranges_bearings[k].fill(1)
     NEESes[k] = slam.NEESes(eta_hat[k][:pose_dim],P_hat[k][:pose_dim, :pose_dim],poseGT[k]) #Done, use provided function slam.NEESes
-    #slam.associate(z,landmarks,0*np.eye(3),0*np.eye(3))
-    #NEESmap = 
 
     if doAssoPlot and k > 0:
         axAsso.clear()
@@ -234,8 +246,8 @@ maxs += offsets
 
 fig2, ax2 = plt.subplots(num=2, clear=True)
 # landmarks
-ax2.scatter(*landmarks.T, c="r", marker="^")
-ax2.scatter(*lmk_est_final.T, c="b", marker=".")
+ax2.scatter(*landmarks.T, c="r", marker="^",label="Ground truth landmarks")
+ax2.scatter(*lmk_est_final.T, c="b", marker=".", label="Estimated landmarks")
 # Draw covariance ellipsis of measurements
 for l, lmk_l in enumerate(lmk_est_final):
     idxs = slice(3 + 2 * l, 3 + 2 * l + 2)
@@ -243,12 +255,15 @@ for l, lmk_l in enumerate(lmk_est_final):
     el = ellipse(lmk_l, rI, 5, 200)
     ax2.plot(*el.T, "b")
 
-ax2.plot(*poseGT.T[:2], c="r", label="gt")
-ax2.plot(*pose_est.T[:2], c="g", label="est")
+ax2.plot(*poseGT.T[:2], c="r", label="Ground truth position")
+ax2.plot(*pose_est.T[:2], c="g", label="Estimated position")
 ax2.plot(*ellipse(pose_est[-1, :2], P_hat[N - 1][:2, :2], 5, 200).T, c="g")
-ax2.set(title="results", xlim=(mins[0], maxs[0]), ylim=(mins[1], maxs[1]))
+ax2.set(title="Map", xlim=(mins[0], maxs[0]), ylim=(mins[1], maxs[1]))
 ax2.axis("equal")
 ax2.grid()
+plt.xlabel("[m]")
+plt.ylabel("[m]")
+ax2.legend()
 
 # %% Consistency
 print("Consistency results:")
@@ -262,7 +277,7 @@ ax3.plot(CInorm[:N,0], '--')
 ax3.plot(CInorm[:N,1], '--')
 ax3.plot(NISnorm[:N], lw=0.5)
 
-ax3.set_title(f'NIS, {insideCI.mean()*100}% inside {confprob*100}% CI')
+ax3.set_title(f'NIS, {np.round(insideCI.mean()*100,2)}% inside {confprob*100}% CI')
 insideCI_ranges = (CInorm_ranges_bearings[:N,0] <= NISnorm_ranges[:N]) * (NISnorm_ranges[:N] <= CInorm_ranges_bearings[:N,1])
 insideCI_bearings = (CInorm_ranges_bearings[:N,0] <= NISnorm_bearings[:N]) * (NISnorm_bearings[:N] <= CInorm_ranges_bearings[:N,1])
 
@@ -274,13 +289,13 @@ ax7[0].plot(NISnorm[:N], lw=0.5)
 
 ax7[0].legend(['CI lower', 'CI upper', 'NIS'])
 
-ax7[0].set_title(f'NIS, {insideCI.mean()*100}% inside {confprob*100}% CI\n')
+ax7[0].set_title(f'NIS, {np.round(insideCI.mean()*100,2)}% inside {confprob*100}% CI\n')
 ax7[1].plot(CInorm_ranges_bearings[:N,0], '--', color='blue')
 ax7[1].plot(CInorm_ranges_bearings[:N,1], '--', color='blue')
 ax7[1].plot(NISnorm_ranges[:N], lw=0.5, color='purple')
 ax7[1].plot(NISnorm_bearings[:N], lw=0.5, color='red')
 ax7[1].legend(['CI lower', 'CI upper','NIS ranges', 'NIS bearings'])
-ax7[1].set_title(f'NIS_ranges, {insideCI_ranges.mean()*100}% inside {confprob*100}% CI\nNIS_bearings, {insideCI_bearings.mean()*100}% inside {confprob*100}% CI')
+ax7[1].set_title(f'NIS_ranges, {np.round(insideCI_ranges.mean()*100,2)}% inside {confprob*100}% CI\nNIS_bearings, {np.round(insideCI_bearings.mean()*100,2)}% inside {confprob*100}% CI')
 
 
 ANIS = np.mean(NISnorm[:N])
@@ -294,7 +309,7 @@ print(f"CI ANIS: {CI_ANIS}")
 # NEES
 
 fig4, ax4 = plt.subplots(nrows=3, ncols=1, figsize=(7, 5), num=4, clear=True, sharex=True)
-tags = ['all', 'pos', 'heading']
+tags = ['pose', 'position', 'heading']
 dfs = [3, 2, 1]
 
 for ax, tag, NEES, df in zip(ax4, tags, NEESes.T, dfs):
@@ -303,7 +318,7 @@ for ax, tag, NEES, df in zip(ax4, tags, NEESes.T, dfs):
     ax.plot(np.full(N, CI_NEES[1]), '--')
     ax.plot(NEES[:N], lw=0.5)
     insideCI = (CI_NEES[0] <= NEES) * (NEES <= CI_NEES[1])
-    ax.set_title(f'NEES {tag}: {insideCI.mean()*100}% inside CI')
+    ax.set_title(f'NEES {tag}: {np.round(insideCI.mean()*100,2)}% inside {confprob*100}% CI')
 
     CI_ANEES = np.array(chi2.interval(confprob, df*N)) / N
     print(f"CI ANEES {tag}: {CI_ANEES}")
@@ -325,7 +340,7 @@ errs = np.vstack((pos_err, heading_err))
 
 for ax, err, tag, ylabel, scaling in zip(ax5, errs, tags[1:], ylabels, scalings):
     ax.plot(err*scaling)
-    ax.set_title(f"{tag}: RMSE {np.sqrt((err**2).mean())*scaling} {ylabel}")
+    ax.set_title(f"{tag}: RMSE {np.round(np.sqrt((err**2).mean())*scaling,2)} {ylabel}")
     ax.set_ylabel(f"[{ylabel}]")
     ax.grid()
 
@@ -373,6 +388,22 @@ if playMovie:
         print(
             "Install celluloid module, \n\n$ pip install celluloid\n\nto get fancy animation of EKFSLAM."
         )
+
+# %% Save plots
+the_time = str(datetime.datetime.now())
+the_time = re.sub(r':',r';', the_time)
+the_time = re.sub(r' ',r'_', the_time)
+print(the_time)
+
+if save_results:
+    zipObj = ZipFile(f"test_simulated{the_time}.zip", 'w')
+    for i in plt.get_fignums():
+        filename = f"fig_simulated{i}{the_time}.pdf"
+        plt.figure(i)
+        plt.savefig(filename)
+        zipObj.write(filename)
+        os.remove(filename)
+    zipObj.close()
 
 plt.show()
 # %%
