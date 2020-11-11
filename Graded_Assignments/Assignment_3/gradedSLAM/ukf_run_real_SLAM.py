@@ -87,13 +87,12 @@ except Exception as e:
             #Subplots and figure
             "figure.figsize" : [8,7],
             "figure.subplot.wspace" : 0.37,
-            "figure.subplot.hspace" : 0.41,
+            "figure.subplot.hspace" : 0.76,
             "figure.subplot.top" : 0.9,
             "figure.subplot.right" : 0.95,
             "figure.subplot.left" : 0.1,
         }
     )
-
 # %% Load data
 VICTORIA_PARK_PATH = "./victoria_park/"
 realSLAM_ws = {
@@ -351,7 +350,6 @@ ax7[2].plot(CInorm_gnss[:k_gnss,0], '--')
 ax7[2].plot(CInorm_gnss[:k_gnss,1], '--')
 ax7[2].plot(NISnorm_gnss[:k_gnss], lw=0.5)
 ax7[2].legend(['CI lower', 'CI upper', 'NIS_gnss'])
-ax7[2].set_ylim(-5,  200  )
 ax7[2].set_title(f'NIS_gnss, {np.round(insideCI_gnss.mean()*100,2)}% inside {confprob*100}% CI\n')
 # %% slam
 
