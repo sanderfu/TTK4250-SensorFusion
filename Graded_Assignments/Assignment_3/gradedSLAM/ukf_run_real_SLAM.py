@@ -194,7 +194,7 @@ t = timeOdo[0]
 
 # %%  run
 print(K)
-N = 20000#K
+N = K#K
 
 doPlot = False
 
@@ -223,7 +223,7 @@ assert np.allclose(P,P_cached), "P has been modified in function!!"
 squared_error = 0
 do_gnss_update = True
 k_gnss = 0
-R_gnss = np.diag([0.45**2,0.45**2])
+R_gnss = np.diag([0.45**2,0.45**2])*10
 
 for k in tqdm(range(N)):
     
@@ -308,10 +308,7 @@ for k in tqdm(range(N)):
         t = timeOdo[k + 1]
         odo = odometry(speed[k + 1], steering[k + 1], dt, car)
         eta, P = ukfslam.predict(eta,P,odo) # Done predict
-        #if not np.all(
-        #   np.linalg.eigvals(P) >= 0
-        #):
-        #    eta, P = ekfslam.predict(eta,P,odo) # Done predict
+
 #RMSE for pose, where GT is GPS measurements
 RMSE = np.sqrt(squared_error/k_gnss)
 
@@ -354,6 +351,7 @@ ax7[2].plot(CInorm_gnss[:k_gnss,0], '--')
 ax7[2].plot(CInorm_gnss[:k_gnss,1], '--')
 ax7[2].plot(NISnorm_gnss[:k_gnss], lw=0.5)
 ax7[2].legend(['CI lower', 'CI upper', 'NIS_gnss'])
+ax7[2].set_ylim(-5,  200  )
 ax7[2].set_title(f'NIS_gnss, {np.round(insideCI_gnss.mean()*100,2)}% inside {confprob*100}% CI\n')
 # %% slam
 
@@ -369,7 +367,7 @@ if do_raw_prediction:
     ax5.plot(*odox[:N, :2].T, label="odom")
     ax5.plot(*xupd[mk_first:mk, :2].T, label="SLAM position")
     ax5.grid()
-    ax5.set_title("GPS vs odometry integration")
+    ax5.set_title(f"Comparison of position. \nTotal RMSE for pose: {np.round(RMSE,2)}")
     ax5.legend()
 
 # %%
@@ -388,9 +386,9 @@ the_time = re.sub(r' ',r'_', the_time)
 print(the_time)
 
 if save_results:
-    zipObj = ZipFile(f"test_real{the_time}.zip", 'w')
+    zipObj = ZipFile(f"test_ukf_real{the_time}.zip", 'w')
     for i in plt.get_fignums():
-        filename = f"fig_real{i}{the_time}.pdf"
+        filename = f"fig_ukf_real{i}{the_time}.pdf"
         plt.figure(i)
         plt.savefig(filename)
         zipObj.write(filename)
