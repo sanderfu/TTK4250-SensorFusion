@@ -367,7 +367,7 @@ if do_raw_prediction:
     ax5.plot(*odox[:N, :2].T, label="odom")
     ax5.plot(*xupd[mk_first:mk, :2].T, label="SLAM position")
     ax5.grid()
-    ax5.set_title(f"Comparison of position. \nTotal RMSE for pose: {np.round(RMSE,2)}")
+    ax5.set_title(f"Comparison of position. \nTotal RMSE for position: {np.round(RMSE,2)}")
     ax5.legend()
 
 # %%
