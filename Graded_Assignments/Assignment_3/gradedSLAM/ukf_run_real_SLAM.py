@@ -128,11 +128,11 @@ car = Car(L, H, a, b)
 
 sigmas = [0.01,0.008,(0.08*np.pi/180)]
 CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
-Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
+Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)*1.5
 
 # %% Initilize
 #Q = np.diag([0.1**2,0.1**2,(np.pi/180)**2]) #INITDONE
-R = np.diag([0.06**2, (0.12*np.pi/180)**2]) #INITDONE
+R = np.diag([0.06**2, (0.12*np.pi/180)**2])*1.1 #INITDONE
 
 
 JCBBalphas = np.array(
@@ -222,7 +222,8 @@ assert np.allclose(P,P_cached), "P has been modified in function!!"
 squared_error = 0
 do_gnss_update = True
 k_gnss = 0
-R_gnss = np.diag([0.45**2,0.45**2])*10
+# good value is * 15 and sigma_process * 1.1
+R_gnss = np.diag([0.45**2,0.45**2])*20
 
 for k in tqdm(range(N)):
     
@@ -307,6 +308,7 @@ for k in tqdm(range(N)):
         t = timeOdo[k + 1]
         odo = odometry(speed[k + 1], steering[k + 1], dt, car)
         eta, P = ukfslam.predict(eta,P,odo) # Done predict
+
 
 #RMSE for pose, where GT is GPS measurements
 RMSE = np.sqrt(squared_error/k_gnss)
