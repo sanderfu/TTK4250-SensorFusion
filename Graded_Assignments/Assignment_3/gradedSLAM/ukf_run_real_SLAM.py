@@ -126,7 +126,7 @@ b = 0.5  # laser distance to the left of center
 
 car = Car(L, H, a, b)
 
-sigmas = [0.01,0.008,(0.08*np.pi/180)]
+sigmas = [0.01,0.008,(0.115*np.pi/180)]
 CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
 Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)*1.5
 
@@ -222,8 +222,8 @@ assert np.allclose(P,P_cached), "P has been modified in function!!"
 squared_error = 0
 do_gnss_update = True
 k_gnss = 0
-# good value is * 15 and sigma_process * 1.1
-R_gnss = np.diag([0.45**2,0.45**2])*20
+#R_gnss = np.diag([0.45**2,0.45**2])*30
+R_gnss = np.diag([0.45**2,0.45**2])*30
 
 for k in tqdm(range(N)):
     
